@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OmniLyrics 设置</title>
+  <style>
+    :root {
+      --bg: #1a1a2e;
+      --fg: #ffffff;
+      --border: #333;
+      --accent: #00ffff;
+      --danger: #ff6b6b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, Arial;
+      background: var(--bg);
+      color: var(--fg);
+      padding: 20px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .close-btn {
+      background: none; border: none; color: var(--fg); font-size: 1.5rem; cursor: pointer;
+    }
+    .section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-size: 0.9rem;
+      color: #888;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .form-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+    .form-row label {
+      min-width: 80px;
+      color: #aaa;
+    }
+    .form-row input, .form-row select {
+      flex: 1;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--fg);
+      font-size: 0.95rem;
+    }
+    .form-row input[type="color"] {
+      width: 60px;
+      height: 36px;
+      padding: 2px;
+      cursor: pointer;
+    }
+    .form-row input[type="checkbox"] {
+      width: auto;
+      cursor: pointer;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .checkbox-row input {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .mode-params {
+      display: none;
+    }
+    .mode-params.active {
+      display: block;
+    }
+    .btn-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+    .btn-primary:hover {
+      background: #00cccc;
+    }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: var(--fg);
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .btn-danger {
+      background: var(--danger);
+      color: #fff;
+    }
+    .btn-danger:hover {
+      background: #ff5252;
+    }
+    .preview-link {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .preview-link:hover {
+      text-decoration: underline;
+    }
+    .status {
+      margin-top: 12px;
+      font-size: 0.9rem;
+      color: #888;
+    }
+    .status.success { color: #4caf50; }
+    .status.error { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <h1>
+    OmniLyrics 设置
+    <a href="index.html" class="close-btn" title="关闭">×</a>
+  </h1>
+
+  <div class="section">
+    <div class="section-title">展示模式</div>
+    <div class="form-row">
+      <label>模式:</label>
+      <select id="mode">
+        <option value="karaoke">单行卡拉OK</option>
+        <option value="scroll">双行滚动</option>
+        <option value="blur">多行渐变模糊</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">通用设置</div>
+    <div class="form-row">
+      <label>字体颜色:</label>
+      <input type="color" id="textColor" value="#ffffff">
+    </div>
+    <div class="form-row">
+      <label>字体大小:</label>
+      <input type="text" id="fontSize" value="2.4rem">
+    </div>
+    <div class="form-row">
+      <label>字体:</label>
+      <input type="text" id="fontFamily" value="system-ui, -apple-system, Arial">
+    </div>
+    <div class="form-row">
+      <label>背景色:</label>
+      <input type="color" id="bgColor" value="#000000">
+    </div>
+    <div class="form-row checkbox-row">
+      <input type="checkbox" id="enableGlow" checked>
+      <label for="enableGlow">启用发光效果</label>
+    </div>
+    <div class="form-row">
+      <label>发光颜色:</label>
+      <input type="color" id="glowColor" value="#00ffff">
+    </div>
+  </div>
+
+  <div class="section" id="paramsKaraoke">
+    <div class="section-title">单行卡拉OK 参数</div>
+    <div class="form-row checkbox-row">
+      <input type="checkbox" id="wordAnimation">
+      <label for="wordAnimation">逐字动画</label>
+    </div>
+    <div class="form-row">
+      <label>动画时长:</label>
+      <input type="number" id="animationDuration" value="0.3" step="0.1" min="0.1">
+    </div>
+    <div class="form-row">
+      <label>当前字缩放:</label>
+      <input type="number" id="currentScale" value="1.05" step="0.01" min="1" max="2">
+    </div>
+  </div>
+
+  <div class="section mode-params" id="paramsScroll">
+    <div class="section-title">双行滚动 参数</div>
+    <div class="form-row checkbox-row">
+      <input type="checkbox" id="showNext" checked>
+      <label for="showNext">显示下一行</label>
+    </div>
+    <div class="form-row">
+      <label>下一行透明度:</label>
+      <input type="number" id="nextOpacity" value="0.6" step="0.1" min="0.1" max="1">
+    </div>
+    <div class="form-row">
+      <label>滚动时长:</label>
+      <input type="number" id="scrollDuration" value="0.4" step="0.1" min="0.1">
+    </div>
+  </div>
+
+  <div class="section mode-params" id="paramsBlur">
+    <div class="section-title">多行渐变模糊 参数</div>
+    <div class="form-row">
+      <label>显示行数:</label>
+      <input type="number" id="visibleLines" value="9" min="3" max="15">
+    </div>
+    <div class="form-row">
+      <label>行距:</label>
+      <input type="number" id="lineSpacing" value="1.5" step="0.1" min="1" max="3">
+    </div>
+    <div class="form-row">
+      <label>滚动速度曲线:</label>
+      <select id="scrollSpeed">
+        <option value="linear">线性（匀速）</option>
+        <option value="cubic">立方（先慢后快）</option>
+        <option value="exponential">指数（先快后慢）</option>
+        <option value="circular">圆形（中间慢）</option>
+        <option value="sine">正弦（平滑）</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>滚动时长:</label>
+      <input type="number" id="scrollDuration" value="0.5" step="0.1" min="0.1">
+    </div>
+    <div class="form-row">
+      <label>亮度衰减:</label>
+      <input type="number" id="opacityDecay" value="0.15" step="0.05" min="0.05" max="0.5">
+    </div>
+    <div class="form-row">
+      <label>模糊递增:</label>
+      <input type="number" id="blurIncrement" value="0.5" step="0.1" min="0.1">
+    </div>
+    <div class="form-row">
+      <label>缩小比例:</label>
+      <input type="number" id="scaleDecay" value="0.1" step="0.05" min="0" max="0.5">
+    </div>
+    <div class="form-row">
+      <label>最大模糊:</label>
+      <input type="number" id="blurMax" value="6" min="1" max="10">
+    </div>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-primary" id="saveBtn">保存</button>
+    <button class="btn btn-secondary" id="resetBtn">恢复默认</button>
+    <a href="index.html" class="btn btn-secondary preview-link" id="previewBtn">实时预览</a>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <script src="scripts/config.js"></script>
+  <script>
+    const DEFAULT_CONFIG = {
+      mode: 'karaoke',
+      colors: { text: '#ffffff', glow: '#00ffff', bg: '#000000' },
+      font: { size: '2.4rem', family: 'system-ui, -apple-system, Arial' },
+      bg: { color: '#000000' },
+      modeParams: {
+        karaoke: { wordGlow: true, glowColor: '#00ffff', animationDuration: 0.3, currentScale: 1.05 },
+        scroll: { showNext: true, nextOpacity: 0.6, scrollDuration: 0.4 },
+        blur: { visibleLines: 9, opacityDecay: 0.15, blurIncrement: 0.5, scaleDecay: 0.1, blurMax: 6 }
+      }
+    };
+
+    let config = null;
+
+    async function loadConfig() {
+      await window.configManager.load();
+      config = window.configManager.get();
+      fillForm();
+    }
+
+    function fillForm() {
+      document.getElementById('mode').value = config.mode || 'karaoke';
+      document.getElementById('textColor').value = config.colors?.text || '#ffffff';
+      document.getElementById('fontSize').value = config.font?.size || '2.4rem';
+      document.getElementById('fontFamily').value = config.font?.family || 'system-ui, -apple-system, Arial';
+      document.getElementById('bgColor').value = config.bg?.color || '#000000';
+      document.getElementById('enableGlow').checked = config.colors?.enableGlow !== false;
+      document.getElementById('glowColor').value = config.colors?.glow || '#00ffff';
+
+      const karaoke = config.modeParams?.karaoke || DEFAULT_CONFIG.modeParams.karaoke;
+      document.getElementById('wordAnimation').checked = karaoke.wordAnimation;
+      document.getElementById('animationDuration').value = karaoke.animationDuration;
+      document.getElementById('currentScale').value = karaoke.currentScale;
+
+      const scroll = config.modeParams?.scroll || DEFAULT_CONFIG.modeParams.scroll;
+      document.getElementById('showNext').checked = scroll.showNext;
+      document.getElementById('nextOpacity').value = scroll.nextOpacity;
+      document.getElementById('scrollDuration').value = scroll.scrollDuration;
+
+      const blur = config.modeParams?.blur || DEFAULT_CONFIG.modeParams.blur;
+      document.getElementById('visibleLines').value = blur.visibleLines;
+      document.getElementById('lineSpacing').value = blur.lineSpacing || 1.5;
+      document.getElementById('scrollSpeed').value = blur.scrollSpeed || 'linear';
+      document.getElementById('scrollDuration').value = blur.scrollDuration || 0.5;
+      document.getElementById('opacityDecay').value = blur.opacityDecay;
+      document.getElementById('blurIncrement').value = blur.blurIncrement;
+      document.getElementById('scaleDecay').value = blur.scaleDecay;
+      document.getElementById('blurMax').value = blur.blurMax;
+
+      updateModeParams();
+    }
+
+    function collectForm() {
+      const newConfig = {
+        mode: document.getElementById('mode').value,
+        colors: {
+          text: document.getElementById('textColor').value,
+          glow: document.getElementById('glowColor').value,
+          bg: document.getElementById('bgColor').value,
+          enableGlow: document.getElementById('enableGlow').checked
+        },
+        font: {
+          size: document.getElementById('fontSize').value,
+          family: document.getElementById('fontFamily').value
+        },
+        bg: {
+          color: document.getElementById('bgColor').value
+        },
+        modeParams: {
+          karaoke: {
+            wordAnimation: document.getElementById('wordAnimation').checked,
+            animationDuration: parseFloat(document.getElementById('animationDuration').value),
+            currentScale: parseFloat(document.getElementById('currentScale').value)
+          },
+          scroll: {
+            showNext: document.getElementById('showNext').checked,
+            nextOpacity: parseFloat(document.getElementById('nextOpacity').value),
+            scrollDuration: parseFloat(document.getElementById('scrollDuration').value)
+          },
+          blur: {
+            visibleLines: parseInt(document.getElementById('visibleLines').value),
+            lineSpacing: parseFloat(document.getElementById('lineSpacing').value),
+            scrollSpeed: document.getElementById('scrollSpeed').value,
+            scrollDuration: parseFloat(document.getElementById('scrollDuration').value),
+            opacityDecay: parseFloat(document.getElementById('opacityDecay').value),
+            blurIncrement: parseFloat(document.getElementById('blurIncrement').value),
+            scaleDecay: parseFloat(document.getElementById('scaleDecay').value),
+            blurMax: parseFloat(document.getElementById('blurMax').value)
+          }
+        }
+      };
+      return newConfig;
+    }
+
+    function updateModeParams() {
+      const mode = document.getElementById('mode').value;
+      document.querySelectorAll('.mode-params').forEach(el => el.classList.remove('active'));
+      const activeParams = document.getElementById('params' + mode.charAt(0).toUpperCase() + mode.slice(1));
+      if (activeParams) activeParams.classList.add('active');
+    }
+
+    function showStatus(msg, isError = false) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'status ' + (isError ? 'error' : 'success');
+      setTimeout(() => { el.textContent = ''; }, 3000);
+    }
+
+    document.getElementById('mode').addEventListener('change', updateModeParams);
+
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      const newConfig = collectForm();
+      const success = await window.configManager.save(newConfig);
+      if (success) {
+        showStatus('配置已保存');
+      } else {
+        showStatus('保存失败', true);
+      }
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', async () => {
+      await window.configManager.reset();
+      config = window.configManager.get();
+      fillForm();
+      showStatus('已恢复默认配置');
+    });
+
+    loadConfig();
+  </script>
+</body>
+</html>

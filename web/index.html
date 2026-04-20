@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OmniLyrics Engine</title>
+  <style>
+    :root {
+      --bg: rgba(0,0,0,0);
+      --fg: #ffffff;
+      --glow: rgba(0,255,255,.9);
+    }
+    html, body {
+      margin: 0; padding: 0; height: 100%; width: 100%;
+      background: transparent;
+      color: var(--fg);
+      overflow: hidden;
+    }
+    
+    #app {
+      position: relative; height: 100%; width: 100%; display: flex; align-items: center; justify-content: center;
+      perspective: 1000px;
+    }
+    #lyricsStage {
+      width: 70vw;
+      max-width: 1200px;
+      height: 60vh;
+      min-height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    #lyricsStage > * { text-align: center; }
+    .cylinder { width: 100%; height: 100%; display: block; transform-style: preserve-3d; position: relative; }
+
+    #lyrics { text-align: center; }
+    .line { font-size: 2.4rem; line-height: 1.15; text-align: center; white-space: nowrap; }
+    .word { display: inline-block; opacity: 0.0; filter: blur(0.0px); }
+    .word[data-visible="true"] {
+      opacity: 1; text-shadow: 0 0 4px var(--glow);
+      --g: 1;
+      text-shadow: 0 0 calc(var(--g) * 6px) rgba(0,255,255,.8);
+      transform: translateZ(0.1px);
+    }
+    .shadow { text-shadow: 0 2px 6px rgba(0,0,0,.4); }
+
+    .scroll-current { font-size: 2.4rem; line-height: 1.3; text-align: center; }
+    .scroll-next { font-size: 2rem; line-height: 1.3; text-align: center; opacity: 0.6; }
+
+    .blur-line {
+      display: block;
+      text-align: center;
+      white-space: nowrap;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+  </style>
+  <script src="libs/gsap.min.js"></script>
+  <script>
+    window.gsap = gsap;
+  </script>
+</head>
+<body>
+  <div id="app">
+    <div id="lyricsStage">
+      <div class="cylinder" id="cylinder">
+        <div id="lyrics" class="line"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="debugInfo" style="position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: #aaa;">
+    Local: 8080 &bull; <a href="settings.html" style="color: #aaa; text-decoration: underline;">设置</a>
+  </div>
+
+  <script src="scripts/config.js"></script>
+  <script src="scripts/renderers/base.js"></script>
+  <script src="scripts/renderers/karaoke.js"></script>
+  <script src="scripts/renderers/scroll.js"></script>
+  <script src="scripts/renderers/blur.js"></script>
+  <script src="scripts/renderers/index.js"></script>
+  <script src="scripts/motion.js"></script>
+  <script>
+    console.log('OmniLyrics: Starting init...');
+    console.log('configManager:', typeof window.configManager);
+    console.log('RendererManager:', typeof window.RendererManager);
+    console.log('KaraokeRenderer:', typeof window.KaraokeRenderer);
+    console.log('motion:', typeof window.motion);
+
+    document.addEventListener('DOMContentLoaded', async function() {
+      console.log('DOM ready, initializing...');
+      try {
+        await window.configManager.load();
+        console.log('Config loaded:', window.configManager.get()?.mode);
+        await window.rendererManager.init('lyrics', 'lyricsStage');
+        console.log('Renderer initialized');
+
+        const isOBS = navigator.userAgent.includes('OBSBrowser') || window.obsstudio;
+        if (isOBS) {
+          document.getElementById('debugInfo').style.display = 'none';
+        }
+      } catch (e) {
+        console.error('Init error:', e);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+.vscode/
+Cache/
+Config/
+.editorconfig
+*.exe
+*.exe~
