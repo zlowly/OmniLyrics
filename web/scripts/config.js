@@ -1,4 +1,8 @@
-const CONFIG_API_BASE = 'http://localhost:8080';
+// 从当前页面 URL 自动提取主机和端口，用于 API 调用
+const CONFIG_API_BASE = (() => {
+    const loc = window.location;
+    return `${loc.protocol}//${loc.host}`;
+})();
 
 const SETTINGS_DEFAULT_CONFIG = {
     mode: 'karaoke',

@@ -37,6 +37,24 @@ class RendererManager {
 
         document.documentElement.style.setProperty('--fg', colors?.text || '#ffffff');
         document.documentElement.style.setProperty('--glow', colors?.glow || 'rgba(0,255,255,.9)');
+
+        // 设置字体
+        const fontFamily = font?.family || 'system-ui, -apple-system, Arial';
+        const fontSize = font?.size || '2.4rem';
+        document.documentElement.style.setProperty('--font-family', fontFamily);
+        document.documentElement.style.setProperty('--font-size', fontSize);
+
+        // 应用到 body 和 stage
+        document.body.style.fontFamily = fontFamily;
+        document.body.style.fontSize = fontSize;
+        if (this.stage) {
+            this.stage.style.fontFamily = fontFamily;
+            this.stage.style.fontSize = fontSize;
+        }
+        if (this.container) {
+            this.container.style.fontFamily = fontFamily;
+            this.container.style.fontSize = fontSize;
+        }
     }
 
     createRenderer() {

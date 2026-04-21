@@ -1,0 +1,9 @@
+{
+    "port": "8080",
+    "log": {
+        "level": "info",
+        "file": ""
+    },
+    "cache-dir": "Cache",
+    "config-dir": "Config"
+}

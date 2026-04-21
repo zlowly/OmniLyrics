@@ -11,27 +11,47 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/omnilyrics/bridge/fonts"
 	"github.com/omnilyrics/bridge/smtc"
 )
 
-func handleHealth(w http.ResponseWriter, r *http.Request) {
+// handleHealth 处理健康检查请求的 HTTP 端点。
+// 该端点用于服务监控和负载均衡探测，始终返回 OK 状态。
+// @param w HTTP 响应写入器
+// @param r HTTP 请求对象
+func handleHealth(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(map[string]string{"status": "OK"})
 }
 
+// StatusHandler 是处理媒体状态请求的函数类型定义。
+// 该类型定义了需要访问 SMTC 接口的处理函数签名。
+// @param w HTTP 响应写入器
+// @param r HTTP 请求对象
+// @param smtc SMTC 接口实例
 type StatusHandler func(w http.ResponseWriter, r *http.Request, smtc smtc.SMTC)
 
+// makeStatusHandler 创建处理媒体状态请求的 HTTP 处理器。
+// 该函数返回一个闭包，捕获 SMTC 实例供后续处理使用。
+// @param s SMTC 接口实例
+// @return http.HandlerFunc 返回配置好的 HTTP 处理函数
 func makeStatusHandler(s smtc.SMTC) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		handleStatus(w, r, s)
 	}
 }
 
-func handleStatus(w http.ResponseWriter, r *http.Request, s smtc.SMTC) {
+// handleStatus 处理获取媒体状态请求的 HTTP 端点。
+// 该端点返回简化版的媒体信息（title、artist、status、position、duration）。
+// @param w HTTP 响应写入器
+// @param r HTTP 请求对象
+// @param s SMTC 接口实例
+func handleStatus(w http.ResponseWriter, _ *http.Request, s smtc.SMTC) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
+	// 获取媒体数据，如果发生错误返回默认空值
 	data, err := s.GetData()
 	if err != nil {
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -44,6 +64,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request, s smtc.SMTC) {
 		return
 	}
 
+	// 返回媒体的简化信息
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"title":    data.Title,
 		"artist":   data.Artist,
@@ -53,25 +74,41 @@ func handleStatus(w http.ResponseWriter, r *http.Request, s smtc.SMTC) {
 	})
 }
 
+// CacheRequest 表示歌词缓存的请求数据结构。
+// 前端 POST 歌词数据时使用此结构进行解析。
 type CacheRequest struct {
-	Title    string `json:"title"`
-	Artist   string `json:"artist"`
-	LRC      string `json:"lrc_content"`
+	// Title 媒体标题
+	Title string `json:"title"`
+	// Artist 艺术家名称
+	Artist string `json:"artist"`
+	// LRC 歌词内容（LRC 格式）
+	LRC string `json:"lrc_content"`
 }
 
+// handleCheckCacheWrapper 创建处理歌词检查请求的 HTTP 处理器。
+// 闭包捕获 cacheDir 参数以确定缓存目录位置。
+// @param cacheDir 缓存目录路径
+// @return http.HandlerFunc 返回配置好的 HTTP 处理函数
 func handleCheckCacheWrapper(cacheDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		handleCheckCache(w, r, cacheDir)
 	}
 }
 
+// handleCheckCache 处理检查歌词缓存请求的 HTTP 端点。
+// 通过 title 和 artist 查询参数查找对应的 .lrc 文件。
+// @param w HTTP 响应写入器
+// @param r HTTP 请求对象
+// @param cacheDir 缓存目录路径
 func handleCheckCache(w http.ResponseWriter, r *http.Request, cacheDir string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
+	// 从查询参数获取标题和艺术家
 	title := r.URL.Query().Get("title")
 	artist := r.URL.Query().Get("artist")
 
+	// 如果缺少必要参数，返回未找到状态
 	if title == "" && artist == "" {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"found":   false,
@@ -80,9 +117,11 @@ func handleCheckCache(w http.ResponseWriter, r *http.Request, cacheDir string) {
 		return
 	}
 
+	// 将艺术家和标题组合作为文件名，注意去除非法字符
 	safeName := sanitizeFilename(artist + "_" + title)
 	filePath := filepath.Join(cacheDir, safeName+".lrc")
 
+	// 检查文件是否存在
 	if _, err := os.Stat(filePath); err == nil {
 		content, err := os.ReadFile(filePath)
 		if err != nil {
@@ -93,6 +132,7 @@ func handleCheckCache(w http.ResponseWriter, r *http.Request, cacheDir string) {
 			})
 			return
 		}
+		// 返回找到的歌词内容
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"found":   true,
 			"content": string(content),
@@ -100,27 +140,39 @@ func handleCheckCache(w http.ResponseWriter, r *http.Request, cacheDir string) {
 		return
 	}
 
+	// 文件不存在，返回未找到
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"found":   false,
 		"content": "",
 	})
 }
 
+// handleUpdateCacheWrapper 创建处理歌词更新请求的 HTTP 处理器。
+// 闭包捕获 cacheDir 参数以确定缓存目录位置。
+// @param cacheDir 缓存目录路径
+// @return http.HandlerFunc 返回配置好的 HTTP 处理函数
 func handleUpdateCacheWrapper(cacheDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		handleUpdateCache(w, r, cacheDir)
 	}
 }
 
+// handleUpdateCache 处理更新歌词缓存请求的 HTTP 端点。
+// 接收 POST 请求，JSON body 包含 title、artist 和 lrc_content 字段。
+// @param w HTTP 响应写入器
+// @param r HTTP 请求对象
+// @param cacheDir 缓存目录路径
 func handleUpdateCache(w http.ResponseWriter, r *http.Request, cacheDir string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
+	// 仅接受 POST 方法
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	// 读取请求体
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("[Error] Failed to read body: %v", err)
@@ -131,6 +183,7 @@ func handleUpdateCache(w http.ResponseWriter, r *http.Request, cacheDir string) 
 
 	log.Printf("[Debug] update_cache received: %s", string(body))
 
+	// 解析 JSON 请求体
 	var req CacheRequest
 	if err := json.Unmarshal(body, &req); err != nil {
 		log.Printf("[Error] JSON parse failed: %v", err)
@@ -138,11 +191,13 @@ func handleUpdateCache(w http.ResponseWriter, r *http.Request, cacheDir string) 
 		return
 	}
 
+	// 验证必要字段
 	if req.Title == "" || req.Artist == "" || req.LRC == "" {
 		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Missing required fields"})
 		return
 	}
 
+	// 生成安全的文件名并写入缓存
 	safeName := sanitizeFilename(req.Artist + "_" + req.Title)
 	filePath := filepath.Join(cacheDir, safeName+".lrc")
 
@@ -158,11 +213,16 @@ func handleUpdateCache(w http.ResponseWriter, r *http.Request, cacheDir string) 
 	})
 }
 
+// makeSMTCHandler 创建处理 SMTC 原始数据请求的 HTTP 处理器。
+// 该端点返回完整的 SMTCData 结构，包含所有字段。
+// @param s SMTC 接口实例
+// @return http.HandlerFunc 返回配置好的 HTTP 处理函数
 func makeSMTCHandler(s smtc.SMTC) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 
+		// 获取完整的 SMTC 数据
 		data, err := s.GetData()
 		if err != nil {
 			json.NewEncoder(w).Encode(map[string]interface{}{
@@ -177,29 +237,47 @@ func makeSMTCHandler(s smtc.SMTC) http.HandlerFunc {
 	}
 }
 
+// sanitizeFilename 将文件名中的非法字符替换为下划线。
+// Windows 文件系统不允许以下字符：\ / : * ? " < > |
+// @param name 原始文件名
+// @return string 返回清理后的安全文件名
 func sanitizeFilename(name string) string {
+	// 正则匹配所有非法字符并替换为下划线
 	reg := regexp.MustCompile(`[\\/:*?"<>|]`)
 	name = reg.ReplaceAllString(name, "_")
 	name = strings.TrimSpace(name)
+	// 确保文件名不为空
 	if name == "" {
 		return "_empty_"
 	}
 	return name
 }
 
+// handleConfigWrapper 创建处理配置请求的 HTTP 处理器。
+// 闭包捕获 configDir 参数以确定配置目录位置。
+// @param configDir 配置目录路径
+// @return http.HandlerFunc 返回配置好的 HTTP 处理函数
 func handleConfigWrapper(configDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		handleConfig(w, r, configDir)
 	}
 }
 
+// handleConfig 处理渲染器配置请求的 HTTP 端点。
+// GET 请求返回配置（文件中的自定义配置或默认配置）。
+// POST 请求保存自定义配置到 renderer.json 文件。
+// @param w HTTP 响应写入器
+// @param r HTTP 请求对象
+// @param configDir 配置目录路径
 func handleConfig(w http.ResponseWriter, r *http.Request, configDir string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	configPath := filepath.Join(configDir, "renderer.json")
 
+	// GET 请求：读取配置
 	if r.Method == "GET" {
+		// 尝试读取已保存的配置文件
 		if _, err := os.Stat(configPath); err == nil {
 			content, err := os.ReadFile(configPath)
 			if err != nil {
@@ -207,8 +285,10 @@ func handleConfig(w http.ResponseWriter, r *http.Request, configDir string) {
 				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 				return
 			}
+			// 直接返回文件内容（保持原格式）
 			w.Write(content)
 		} else {
+			// 文件不存在，返回默认配置
 			defaultConfig := map[string]interface{}{
 				"mode": "karaoke",
 				"colors": map[string]interface{}{
@@ -251,6 +331,7 @@ func handleConfig(w http.ResponseWriter, r *http.Request, configDir string) {
 		return
 	}
 
+	// POST 请求：保存配置
 	if r.Method == "POST" {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -258,6 +339,7 @@ func handleConfig(w http.ResponseWriter, r *http.Request, configDir string) {
 			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read request body"})
 			return
 		}
+		// 写入配置文件（保持原始 JSON 格式）
 		if err := os.WriteFile(configPath, body, 0644); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -269,6 +351,32 @@ func handleConfig(w http.ResponseWriter, r *http.Request, configDir string) {
 	}
 }
 
+// init 在包初始化时输出提示信息，表示 HTTP 处理器已注册
 func init() {
 	fmt.Println("[Handlers] HTTP handlers initialized")
+}
+
+// handleFonts 处理获取系统字体列表的 HTTP 端点。
+// 返回系统已安装的字体名称列表。
+// @param w HTTP 响应写入器
+// @param r HTTP 请求对象
+func handleFonts(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	fonts, err := fonts.GetSystemFonts()
+	if err != nil {
+		log.Printf("[Error] Failed to get system fonts: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+			"fonts":   []string{},
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"fonts":   fonts,
+	})
 }

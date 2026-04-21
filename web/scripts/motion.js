@@ -1,7 +1,11 @@
 // motion.js - 驱动层：逻辑运动引擎
 // 职责：心跳监测、多源竞态调度、状态计算
 
-const API_BASE = 'http://localhost:8080';
+// 从当前页面 URL 自动提取主机和端口，用于 API 调用
+const API_BASE = (() => {
+    const loc = window.location;
+    return `${loc.protocol}//${loc.host}`;
+})();
 const LRCLIB_API = 'https://lrclib.net/api/get';
 
 async function convertToTraditional(text) {
@@ -47,21 +51,63 @@ function parseLRCInternal(lrcText) {
     if (!lrcText || typeof lrcText !== 'string') return [];
     lrcText = lrcText.replace(/^\uFEFF/, '');
     const lines = [];
-    const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+    const lineTimeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
     const cleaned = cleanLRCInternal(lrcText);
 
     const rawLines = cleaned.split('\n');
     for (const rawLine of rawLines) {
         const trimmed = rawLine.trim();
         if (!trimmed) continue;
-        const match = timeRegex.exec(trimmed);
-        if (!match) continue;
-        const min = parseInt(match[1]);
-        const sec = parseInt(match[2]);
-        const ms = match[3].length === 3 ? parseInt(match[3]) : parseInt(match[3]) * 10;
-        const timeMs = (min * 60 + sec) * 1000 + ms;
-        const text = trimmed.substring(match[0].length).trim();
-        if (text) lines.push({ time: timeMs, text });
+
+        // 查找行首的第一个时间戳作为行时间
+        const lineMatch = lineTimeRegex.exec(trimmed);
+        if (!lineMatch) continue;
+
+        const min = parseInt(lineMatch[1]);
+        const sec = parseInt(lineMatch[2]);
+        const ms = lineMatch[3].length === 3 ? parseInt(lineMatch[3]) : parseInt(lineMatch[3]) * 10;
+        const lineTimeMs = (min * 60 + sec) * 1000 + ms;
+
+        // 提取行文本（去除行首时间戳）
+        const text = trimmed.substring(lineMatch[0].length);
+
+        // 解析逐字时间戳：每个字前面都有 [mm:ss.xx]
+        // 格式：[00:00.000]汪[00:01.054]苏[00:02.108]泷
+        const words = [];
+        const wordRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]([^\[]+)/g;
+        let match;
+
+        console.log('[LRC] Parsing line:', trimmed);
+
+        while ((match = wordRegex.exec(trimmed)) !== null) {
+            const wMin = parseInt(match[1]);
+            const wSec = parseInt(match[2]);
+            const wMs = match[3].length === 3 ? parseInt(match[3]) : parseInt(match[3]) * 10;
+            const wordTimeMs = (wMin * 60 + wSec) * 1000 + wMs;
+            const wordText = match[4]; // 时间戳后面的文本
+
+            console.log('[LRC] Word match:', match[0], '-> time:', wordTimeMs, 'text:', wordText);
+
+            // 逐字拆分（支持汉字和英文字符）
+            for (const char of wordText) {
+                if (char.trim()) {
+                    words.push({ time: wordTimeMs, text: char });
+                }
+            }
+        }
+
+        console.log('[LRC] Words found:', words.length);
+
+        // 如果有逐字时间戳（words 数量 > 1），使用逐字格式
+        // 同时清理 text 中的时间戳，只保留纯文本
+        const cleanText = text.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '').trim();
+
+        if (words.length > 1) {
+            lines.push({ time: lineTimeMs, text: cleanText, words: words });
+        } else if (cleanText) {
+            // 普通行
+            lines.push({ time: lineTimeMs, text: cleanText });
+        }
     }
     return lines.sort((a, b) => a.time - b.time);
 }
@@ -290,7 +336,8 @@ parseLRC(lrcText) {
             lineProgress: progress,
             isInterlude,
             countdown: isInterlude ? Math.max(0, Math.ceil((curr.time - pos) / 1000)) : 0,
-            velocity: this.velocity
+            velocity: this.velocity,
+            position: pos  // 添加当前播放位置（毫秒），用于逐字高亮
         };
     }
 

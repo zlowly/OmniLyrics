@@ -11,6 +11,7 @@
       --border: #333;
       --accent: #00ffff;
       --danger: #ff6b6b;
+      --card-bg: rgba(255,255,255,0.05);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -20,81 +21,222 @@
       padding: 20px;
       min-height: 100vh;
     }
-    h1 { font-size: 1.5rem; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+
+    /* 布局容器 */
+    .settings-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    /* 顶部标题栏 */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    .header h1 {
+      font-size: 1.5rem;
+    }
     .close-btn {
-      background: none; border: none; color: var(--fg); font-size: 1.5rem; cursor: pointer;
+      background: none;
+      border: none;
+      color: var(--fg);
+      font-size: 1.5rem;
+      cursor: pointer;
+      text-decoration: none;
     }
-    .section {
-      background: rgba(255,255,255,0.05);
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 16px;
+    .close-btn:hover { opacity: 0.8; }
+
+    /* 模式选择卡片 - 最高优先级 */
+    .mode-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 2px solid var(--accent);
     }
-    .section-title {
-      font-size: 0.9rem;
-      color: #888;
+    .mode-card .section-title {
+      color: var(--accent);
       margin-bottom: 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
     }
-    .form-row {
+    .mode-select-wrapper {
       display: flex;
       gap: 12px;
-      margin-bottom: 12px;
-      align-items: center;
+      flex-wrap: wrap;
     }
-    .form-row label {
-      min-width: 80px;
+    .mode-option {
+      flex: 1;
+      min-width: 140px;
+      padding: 12px 16px;
+      background: rgba(0,0,0,0.3);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .mode-option:hover {
+      border-color: #555;
+    }
+    .mode-option.active {
+      border-color: var(--accent);
+      background: rgba(0,255,255,0.1);
+    }
+    .mode-option .mode-name {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .mode-option .mode-desc {
+      font-size: 0.8rem;
+      color: #888;
+    }
+    .mode-option input { display: none; }
+
+    /* 内容区域网格布局 */
+    .content-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 700px) {
+      .content-grid { grid-template-columns: 1fr; }
+    }
+
+    /* 卡片样式 */
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card.full-width {
+      grid-column: 1 / -1;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: bold;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* 两列网格表单 */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 500px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    /* 表单项 */
+    .form-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-item label {
+      font-size: 0.85rem;
       color: #aaa;
     }
-    .form-row input, .form-row select {
-      flex: 1;
-      padding: 8px 12px;
+    .form-item input,
+    .form-item select {
+      padding: 10px 12px;
       background: rgba(0,0,0,0.3);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: 6px;
       color: var(--fg);
       font-size: 0.95rem;
+      width: 100%;
     }
-    .form-row input[type="color"] {
-      width: 60px;
-      height: 36px;
-      padding: 2px;
+    .form-item input:focus,
+    .form-item select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .form-item input[type="color"] {
+      height: 42px;
+      padding: 4px;
       cursor: pointer;
     }
-    .form-row input[type="checkbox"] {
-      width: auto;
-      cursor: pointer;
-    }
-    .checkbox-row {
+
+    /* 开关样式 */
+    .switch-wrapper {
       display: flex;
       align-items: center;
-      gap: 8px;
-      cursor: pointer;
+      justify-content: space-between;
+      padding: 12px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
     }
-    .checkbox-row input {
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
+    .switch-label {
+      font-size: 0.95rem;
     }
-    .mode-params {
+    .switch {
+      position: relative;
+      width: 48px;
+      height: 26px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .switch-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #444;
+      transition: 0.3s;
+      border-radius: 26px;
+    }
+    .switch-slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+    .switch input:checked + .switch-slider {
+      background-color: var(--accent);
+    }
+    .switch input:checked + .switch-slider:before {
+      transform: translateX(22px);
+    }
+
+    /* 条件隐藏 */
+    .hidden { display: none !important; }
+
+    /* 模式参数卡片 - 默认隐藏 */
+    .mode-params-card {
       display: none;
     }
-    .mode-params.active {
+    .mode-params-card.active {
       display: block;
     }
+
+    /* 底部按钮 */
     .btn-group {
       display: flex;
       gap: 12px;
-      margin-top: 20px;
+      margin-top: 24px;
+      flex-wrap: wrap;
     }
     .btn {
-      padding: 10px 20px;
+      padding: 12px 24px;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       font-size: 0.95rem;
       cursor: pointer;
       transition: all 0.2s;
+      text-decoration: none;
+      display: inline-block;
+      text-align: center;
     }
     .btn-primary {
       background: var(--accent);
@@ -110,214 +252,391 @@
     .btn-secondary:hover {
       background: rgba(255,255,255,0.2);
     }
-    .btn-danger {
-      background: var(--danger);
-      color: #fff;
-    }
-    .btn-danger:hover {
-      background: #ff5252;
-    }
-    .preview-link {
-      color: var(--accent);
-      text-decoration: none;
-    }
-    .preview-link:hover {
-      text-decoration: underline;
-    }
+
+    /* 状态提示 */
     .status {
-      margin-top: 12px;
+      margin-top: 16px;
       font-size: 0.9rem;
       color: #888;
+      text-align: center;
     }
     .status.success { color: #4caf50; }
     .status.error { color: var(--danger); }
   </style>
 </head>
 <body>
-  <h1>
-    OmniLyrics 设置
-    <a href="index.html" class="close-btn" title="关闭">×</a>
-  </h1>
-
-  <div class="section">
-    <div class="section-title">展示模式</div>
-    <div class="form-row">
-      <label>模式:</label>
-      <select id="mode">
-        <option value="karaoke">单行卡拉OK</option>
-        <option value="scroll">双行滚动</option>
-        <option value="blur">多行渐变模糊</option>
-      </select>
+  <div class="settings-container">
+    <!-- 顶部标题 -->
+    <div class="header">
+      <h1>OmniLyrics 设置</h1>
+      <a href="index.html" class="close-btn" title="关闭">×</a>
     </div>
+
+    <!-- 展示模式选择 - 最高优先级 -->
+    <div class="mode-card">
+      <div class="section-title">展示模式</div>
+      <div class="mode-select-wrapper">
+        <label class="mode-option active" data-mode="karaoke">
+          <input type="radio" name="mode" value="karaoke" checked>
+          <div class="mode-name">单行卡拉OK</div>
+          <div class="mode-desc">逐字高亮发光</div>
+        </label>
+        <label class="mode-option" data-mode="scroll">
+          <input type="radio" name="mode" value="scroll">
+          <div class="mode-name">双行滚动</div>
+          <div class="mode-desc">上下行交替滚动</div>
+        </label>
+        <label class="mode-option" data-mode="blur">
+          <input type="radio" name="mode" value="blur">
+          <div class="mode-name">多行渐变模糊</div>
+          <div class="mode-desc">亮度模糊尺寸渐变</div>
+        </label>
+      </div>
+    </div>
+
+    <!-- 通用设置 -->
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-title">通用设置</div>
+        <div class="form-grid">
+          <div class="form-item">
+            <label>字体颜色</label>
+            <input type="color" id="textColor" value="#ffffff">
+          </div>
+          <div class="form-item">
+            <label>背景色</label>
+            <input type="color" id="bgColor" value="#000000">
+          </div>
+          <div class="form-item">
+            <label>字体大小</label>
+            <input type="text" id="fontSize" value="2.4rem">
+          </div>
+          <div class="form-item">
+            <label>西文字体</label>
+            <select id="fontFamilyLatin">
+              <option value="Arial">Arial</option>
+              <option value="Helvetica">Helvetica</option>
+              <option value="Times New Roman">Times New Roman</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Verdana">Verdana</option>
+              <option value="system-ui">system-ui</option>
+            </select>
+          </div>
+          <div class="form-item">
+            <label>中日韩字体</label>
+            <select id="fontFamilyCJK">
+              <option value="Microsoft YaHei">微软雅黑</option>
+              <option value="SimSun">宋体</option>
+              <option value="SimHei">黑体</option>
+              <option value="PingFang SC">苹方-简</option>
+              <option value="Hiragino Sans GB">冬青黑体</option>
+              <option value="Noto Sans SC">思源黑体</option>
+              <option value="Source Han Sans CN">思源黑体</option>
+            </select>
+          </div>
+          <div class="form-item" style="grid-column: 1 / -1;">
+            <label>预览</label>
+            <div id="fontPreview" style="
+              padding: 16px; 
+              background: rgba(0,0,0,0.3); 
+              border-radius: 6px; 
+              font-size: 1.5rem;
+              text-align: center;
+              color: #fff;
+              text-shadow: 0 0 10px rgba(0,255,255,0.8);
+            ">Hello World 123 歌词预览</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 发光效果 -->
+      <div class="card">
+        <div class="card-title">发光效果</div>
+        <div class="switch-wrapper">
+          <span class="switch-label">启用发光效果</span>
+          <label class="switch">
+            <input type="checkbox" id="enableGlow" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+        <div class="form-item" id="glowColorWrapper" style="margin-top: 16px;">
+          <label>发光颜色</label>
+          <input type="color" id="glowColor" value="#00ffff">
+        </div>
+      </div>
+
+      <!-- 模式参数：单行卡拉OK -->
+      <div class="card full-width mode-params-card active" id="paramsKaraoke">
+        <div class="card-title">单行卡拉OK 参数</div>
+        <div class="form-grid">
+          <div class="switch-wrapper">
+            <span class="switch-label">逐字动画</span>
+            <label class="switch">
+              <input type="checkbox" id="wordAnimation" checked>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+          <div></div>
+          <div class="form-item">
+            <label>动画时长 (秒)</label>
+            <input type="number" id="animationDuration" value="0.3" step="0.1" min="0.1">
+          </div>
+          <div class="form-item">
+            <label>当前字缩放</label>
+            <input type="number" id="currentScale" value="1.05" step="0.01" min="1" max="2">
+          </div>
+        </div>
+      </div>
+
+      <!-- 模式参数：双行滚动 -->
+      <div class="card full-width mode-params-card" id="paramsScroll">
+        <div class="card-title">双行滚动 参数</div>
+        <div class="form-grid">
+          <div class="switch-wrapper">
+            <span class="switch-label">显示下一行</span>
+            <label class="switch">
+              <input type="checkbox" id="showNext" checked>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+          <div></div>
+          <div class="form-item">
+            <label>下一行透明度</label>
+            <input type="number" id="nextOpacity" value="0.6" step="0.1" min="0.1" max="1">
+          </div>
+          <div class="form-item">
+            <label>滚动时长 (秒)</label>
+            <input type="number" id="scrollDuration" value="0.4" step="0.1" min="0.1">
+          </div>
+        </div>
+      </div>
+
+      <!-- 模式参数：多行渐变模糊 -->
+      <div class="card full-width mode-params-card" id="paramsBlur">
+        <div class="card-title">多行渐变模糊 参数</div>
+        <div class="form-grid">
+          <div class="form-item">
+            <label>显示行数</label>
+            <input type="number" id="visibleLines" value="9" min="3" max="15">
+          </div>
+          <div class="form-item">
+            <label>行距</label>
+            <input type="number" id="lineSpacing" value="1.5" step="0.1" min="1" max="3">
+          </div>
+          <div class="form-item">
+            <label>滚动速度曲线</label>
+            <select id="scrollSpeed">
+              <option value="linear">线性（匀速）</option>
+              <option value="cubic">立方（先慢后快）</option>
+              <option value="exponential">指数（先快后慢）</option>
+              <option value="circular">圆形（中间慢）</option>
+              <option value="sine">正弦（平滑）</option>
+            </select>
+          </div>
+          <div class="form-item">
+            <label>滚动时长 (秒)</label>
+            <input type="number" id="blurScrollDuration" value="0.5" step="0.1" min="0.1">
+          </div>
+          <div class="form-item">
+            <label>亮度衰减</label>
+            <input type="number" id="opacityDecay" value="0.15" step="0.05" min="0.05" max="0.5">
+          </div>
+          <div class="form-item">
+            <label>模糊递增</label>
+            <input type="number" id="blurIncrement" value="0.5" step="0.1" min="0.1">
+          </div>
+          <div class="form-item">
+            <label>缩小比例</label>
+            <input type="number" id="scaleDecay" value="0.1" step="0.05" min="0" max="0.5">
+          </div>
+          <div class="form-item">
+            <label>最大模糊</label>
+            <input type="number" id="blurMax" value="6" min="1" max="10">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部按钮 -->
+    <div class="btn-group">
+      <button class="btn btn-primary" id="saveBtn">保存配置</button>
+      <button class="btn btn-secondary" id="resetBtn">恢复默认</button>
+      <a href="index.html" class="btn btn-secondary">实时预览</a>
+    </div>
+
+    <div class="status" id="status"></div>
   </div>
-
-  <div class="section">
-    <div class="section-title">通用设置</div>
-    <div class="form-row">
-      <label>字体颜色:</label>
-      <input type="color" id="textColor" value="#ffffff">
-    </div>
-    <div class="form-row">
-      <label>字体大小:</label>
-      <input type="text" id="fontSize" value="2.4rem">
-    </div>
-    <div class="form-row">
-      <label>字体:</label>
-      <input type="text" id="fontFamily" value="system-ui, -apple-system, Arial">
-    </div>
-    <div class="form-row">
-      <label>背景色:</label>
-      <input type="color" id="bgColor" value="#000000">
-    </div>
-    <div class="form-row checkbox-row">
-      <input type="checkbox" id="enableGlow" checked>
-      <label for="enableGlow">启用发光效果</label>
-    </div>
-    <div class="form-row">
-      <label>发光颜色:</label>
-      <input type="color" id="glowColor" value="#00ffff">
-    </div>
-  </div>
-
-  <div class="section" id="paramsKaraoke">
-    <div class="section-title">单行卡拉OK 参数</div>
-    <div class="form-row checkbox-row">
-      <input type="checkbox" id="wordAnimation">
-      <label for="wordAnimation">逐字动画</label>
-    </div>
-    <div class="form-row">
-      <label>动画时长:</label>
-      <input type="number" id="animationDuration" value="0.3" step="0.1" min="0.1">
-    </div>
-    <div class="form-row">
-      <label>当前字缩放:</label>
-      <input type="number" id="currentScale" value="1.05" step="0.01" min="1" max="2">
-    </div>
-  </div>
-
-  <div class="section mode-params" id="paramsScroll">
-    <div class="section-title">双行滚动 参数</div>
-    <div class="form-row checkbox-row">
-      <input type="checkbox" id="showNext" checked>
-      <label for="showNext">显示下一行</label>
-    </div>
-    <div class="form-row">
-      <label>下一行透明度:</label>
-      <input type="number" id="nextOpacity" value="0.6" step="0.1" min="0.1" max="1">
-    </div>
-    <div class="form-row">
-      <label>滚动时长:</label>
-      <input type="number" id="scrollDuration" value="0.4" step="0.1" min="0.1">
-    </div>
-  </div>
-
-  <div class="section mode-params" id="paramsBlur">
-    <div class="section-title">多行渐变模糊 参数</div>
-    <div class="form-row">
-      <label>显示行数:</label>
-      <input type="number" id="visibleLines" value="9" min="3" max="15">
-    </div>
-    <div class="form-row">
-      <label>行距:</label>
-      <input type="number" id="lineSpacing" value="1.5" step="0.1" min="1" max="3">
-    </div>
-    <div class="form-row">
-      <label>滚动速度曲线:</label>
-      <select id="scrollSpeed">
-        <option value="linear">线性（匀速）</option>
-        <option value="cubic">立方（先慢后快）</option>
-        <option value="exponential">指数（先快后慢）</option>
-        <option value="circular">圆形（中间慢）</option>
-        <option value="sine">正弦（平滑）</option>
-      </select>
-    </div>
-    <div class="form-row">
-      <label>滚动时长:</label>
-      <input type="number" id="scrollDuration" value="0.5" step="0.1" min="0.1">
-    </div>
-    <div class="form-row">
-      <label>亮度衰减:</label>
-      <input type="number" id="opacityDecay" value="0.15" step="0.05" min="0.05" max="0.5">
-    </div>
-    <div class="form-row">
-      <label>模糊递增:</label>
-      <input type="number" id="blurIncrement" value="0.5" step="0.1" min="0.1">
-    </div>
-    <div class="form-row">
-      <label>缩小比例:</label>
-      <input type="number" id="scaleDecay" value="0.1" step="0.05" min="0" max="0.5">
-    </div>
-    <div class="form-row">
-      <label>最大模糊:</label>
-      <input type="number" id="blurMax" value="6" min="1" max="10">
-    </div>
-  </div>
-
-  <div class="btn-group">
-    <button class="btn btn-primary" id="saveBtn">保存</button>
-    <button class="btn btn-secondary" id="resetBtn">恢复默认</button>
-    <a href="index.html" class="btn btn-secondary preview-link" id="previewBtn">实时预览</a>
-  </div>
-
-  <div class="status" id="status"></div>
 
   <script src="scripts/config.js"></script>
   <script>
     const DEFAULT_CONFIG = {
       mode: 'karaoke',
-      colors: { text: '#ffffff', glow: '#00ffff', bg: '#000000' },
+      colors: { text: '#ffffff', glow: '#00ffff', bg: '#000000', enableGlow: true },
       font: { size: '2.4rem', family: 'system-ui, -apple-system, Arial' },
       bg: { color: '#000000' },
       modeParams: {
-        karaoke: { wordGlow: true, glowColor: '#00ffff', animationDuration: 0.3, currentScale: 1.05 },
+        karaoke: { wordAnimation: true, animationDuration: 0.3, currentScale: 1.05 },
         scroll: { showNext: true, nextOpacity: 0.6, scrollDuration: 0.4 },
-        blur: { visibleLines: 9, opacityDecay: 0.15, blurIncrement: 0.5, scaleDecay: 0.1, blurMax: 6 }
+        blur: { visibleLines: 9, lineSpacing: 1.5, scrollSpeed: 'linear', scrollDuration: 0.5, opacityDecay: 0.15, blurIncrement: 0.5, scaleDecay: 0.1, blurMax: 6 }
       }
     };
 
     let config = null;
 
+    // 加载配置
     async function loadConfig() {
       await window.configManager.load();
       config = window.configManager.get();
       fillForm();
     }
 
-    function fillForm() {
-      document.getElementById('mode').value = config.mode || 'karaoke';
+    // 填充表单
+    async function fillForm() {
+      // 模式选择
+      const mode = config.mode || 'karaoke';
+      document.querySelectorAll('.mode-option').forEach(opt => {
+        opt.classList.toggle('active', opt.dataset.mode === mode);
+        opt.querySelector('input').checked = opt.dataset.mode === mode;
+      });
+
+      // 通用设置
       document.getElementById('textColor').value = config.colors?.text || '#ffffff';
-      document.getElementById('fontSize').value = config.font?.size || '2.4rem';
-      document.getElementById('fontFamily').value = config.font?.family || 'system-ui, -apple-system, Arial';
       document.getElementById('bgColor').value = config.bg?.color || '#000000';
+      document.getElementById('fontSize').value = config.font?.size || '2.4rem';
+
+      // 解析字体配置（格式："西文字体, 中日韩字体" 或单个字体）
+      const fontFamily = config.font?.family || 'system-ui, Microsoft YaHei';
+      const fonts = fontFamily.split(',').map(f => f.trim());
+      const latinFont = fonts[0] || 'Arial';
+      const cjkFont = fonts[1] || 'Microsoft YaHei';
+
+      // 从后端获取系统字体列表并填充下拉框
+      await loadSystemFonts(latinFont, cjkFont);
+
       document.getElementById('enableGlow').checked = config.colors?.enableGlow !== false;
       document.getElementById('glowColor').value = config.colors?.glow || '#00ffff';
 
+      // 更新预览
+      updateFontPreview();
+
+      // 卡拉OK参数
       const karaoke = config.modeParams?.karaoke || DEFAULT_CONFIG.modeParams.karaoke;
-      document.getElementById('wordAnimation').checked = karaoke.wordAnimation;
+      document.getElementById('wordAnimation').checked = karaoke.wordAnimation !== false;
       document.getElementById('animationDuration').value = karaoke.animationDuration;
       document.getElementById('currentScale').value = karaoke.currentScale;
 
+      // 滚动参数
       const scroll = config.modeParams?.scroll || DEFAULT_CONFIG.modeParams.scroll;
-      document.getElementById('showNext').checked = scroll.showNext;
+      document.getElementById('showNext').checked = scroll.showNext !== false;
       document.getElementById('nextOpacity').value = scroll.nextOpacity;
       document.getElementById('scrollDuration').value = scroll.scrollDuration;
 
+      // 模糊参数
       const blur = config.modeParams?.blur || DEFAULT_CONFIG.modeParams.blur;
       document.getElementById('visibleLines').value = blur.visibleLines;
       document.getElementById('lineSpacing').value = blur.lineSpacing || 1.5;
       document.getElementById('scrollSpeed').value = blur.scrollSpeed || 'linear';
-      document.getElementById('scrollDuration').value = blur.scrollDuration || 0.5;
+      document.getElementById('blurScrollDuration').value = blur.scrollDuration || 0.5;
       document.getElementById('opacityDecay').value = blur.opacityDecay;
       document.getElementById('blurIncrement').value = blur.blurIncrement;
       document.getElementById('scaleDecay').value = blur.scaleDecay;
       document.getElementById('blurMax').value = blur.blurMax;
 
       updateModeParams();
+      updateGlowColor();
     }
 
+    // 从后端加载系统字体列表并填充下拉框
+    async function loadSystemFonts(selectedLatin, selectedCJK) {
+      try {
+        const response = await fetch(`${CONFIG_API_BASE}/fonts`);
+        const data = await response.json();
+
+        if (!data.success || !data.fonts) {
+          console.warn('[Fonts] Failed to load system fonts, using defaults');
+          return;
+        }
+
+        const fonts = data.fonts;
+        const latinSelect = document.getElementById('fontFamilyLatin');
+        const cjkSelect = document.getElementById('fontFamilyCJK');
+
+        // 保存当前选中值
+        const currentLatin = latinSelect.value;
+        const currentCJK = cjkSelect.value;
+
+        // 清空并填充选项
+        latinSelect.innerHTML = '';
+        cjkSelect.innerHTML = '';
+
+        // 分类字体（简单策略：包含中文或CJK关键字的归为CJK字体）
+        const cjkKeywords = ['YaHei', 'Hei', 'Song', 'Kai', 'Ming', 'Fang', 'SC', 'TC', 'CN', 'JP', 'KR', 'Noto', 'WenQuanYi', 'Droid', 'Source Han', 'PingFang', 'Hiragino'];
+
+        fonts.forEach(font => {
+          const name = font.name;
+          const isCJK = cjkKeywords.some(kw => name.includes(kw)) || /[\u4e00-\u9fff]/.test(name);
+
+          // 添加到西文字体列表
+          const latinOption = document.createElement('option');
+          latinOption.value = name;
+          latinOption.textContent = name;
+          latinSelect.appendChild(latinOption);
+
+          // 同时添加 CJK 字体列表
+          if (isCJK) {
+            const cjkOption = document.createElement('option');
+            cjkOption.value = name;
+            cjkOption.textContent = name;
+            cjkSelect.appendChild(cjkOption);
+          }
+        });
+
+        // 恢复选中值，如果没有则使用传入的值
+        latinSelect.value = currentLatin || selectedLatin || 'Arial';
+        cjkSelect.value = currentCJK || selectedCJK || 'Microsoft YaHei';
+
+        // 如果保存的值不在列表中，添加到列表并选中
+        if (selectedLatin && !fonts.find(f => f.name === selectedLatin)) {
+          const opt = document.createElement('option');
+          opt.value = selectedLatin;
+          opt.textContent = selectedLatin;
+          latinSelect.appendChild(opt);
+          latinSelect.value = selectedLatin;
+        }
+        if (selectedCJK && !fonts.find(f => f.name === selectedCJK)) {
+          const opt = document.createElement('option');
+          opt.value = selectedCJK;
+          opt.textContent = selectedCJK;
+          cjkSelect.appendChild(opt);
+          cjkSelect.value = selectedCJK;
+        }
+
+      } catch (e) {
+        console.error('[Fonts] Error loading system fonts:', e);
+      }
+    }
+
+    // 更新字体预览
+    function updateFontPreview() {
+      const latinFont = document.getElementById('fontFamilyLatin').value;
+      const cjkFont = document.getElementById('fontFamilyCJK').value;
+      const textColor = document.getElementById('textColor').value;
+      const glowColor = document.getElementById('glowColor').value;
+      const enableGlow = document.getElementById('enableGlow').checked;
+
+      const preview = document.getElementById('fontPreview');
+      preview.style.fontFamily = `"${latinFont}", "${cjkFont}", sans-serif`;
+      preview.style.color = textColor;
+      preview.style.textShadow = enableGlow ? `0 0 10px ${glowColor}` : 'none';
+    }
+
+    // 收集表单数据
     function collectForm() {
-      const newConfig = {
-        mode: document.getElementById('mode').value,
+      const mode = document.querySelector('.mode-option.active').dataset.mode;
+      const latinFont = document.getElementById('fontFamilyLatin').value;
+      const cjkFont = document.getElementById('fontFamilyCJK').value;
+      return {
+        mode: mode,
         colors: {
           text: document.getElementById('textColor').value,
           glow: document.getElementById('glowColor').value,
@@ -326,7 +645,7 @@
         },
         font: {
           size: document.getElementById('fontSize').value,
-          family: document.getElementById('fontFamily').value
+          family: `${latinFont}, ${cjkFont}`
         },
         bg: {
           color: document.getElementById('bgColor').value
@@ -346,7 +665,7 @@
             visibleLines: parseInt(document.getElementById('visibleLines').value),
             lineSpacing: parseFloat(document.getElementById('lineSpacing').value),
             scrollSpeed: document.getElementById('scrollSpeed').value,
-            scrollDuration: parseFloat(document.getElementById('scrollDuration').value),
+            scrollDuration: parseFloat(document.getElementById('blurScrollDuration').value),
             opacityDecay: parseFloat(document.getElementById('opacityDecay').value),
             blurIncrement: parseFloat(document.getElementById('blurIncrement').value),
             scaleDecay: parseFloat(document.getElementById('scaleDecay').value),
@@ -354,33 +673,55 @@
           }
         }
       };
-      return newConfig;
     }
 
+    // 更新模式参数显示
     function updateModeParams() {
-      const mode = document.getElementById('mode').value;
-      document.querySelectorAll('.mode-params').forEach(el => el.classList.remove('active'));
-      const activeParams = document.getElementById('params' + mode.charAt(0).toUpperCase() + mode.slice(1));
-      if (activeParams) activeParams.classList.add('active');
+      const mode = document.querySelector('.mode-option.active').dataset.mode;
+      document.querySelectorAll('.mode-params-card').forEach(card => {
+        card.classList.remove('active');
+      });
+      document.getElementById('params' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
     }
 
+    // 更新发光颜色显示（根据开关）
+    function updateGlowColor() {
+      const wrapper = document.getElementById('glowColorWrapper');
+      wrapper.classList.toggle('hidden', !document.getElementById('enableGlow').checked);
+    }
+
+    // 显示状态
     function showStatus(msg, isError = false) {
       const el = document.getElementById('status');
-      el.textContent = msg;
+      el.innerHTML = msg;
       el.className = 'status ' + (isError ? 'error' : 'success');
-      setTimeout(() => { el.textContent = ''; }, 3000);
+      setTimeout(() => { el.textContent = ''; }, 5000);
     }
 
-    document.getElementById('mode').addEventListener('change', updateModeParams);
+    // 事件监听
+    document.querySelectorAll('.mode-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        document.querySelectorAll('.mode-option').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        opt.querySelector('input').checked = true;
+        updateModeParams();
+      });
+    });
+
+    // 字体和颜色变化时更新预览
+    document.getElementById('fontFamilyLatin').addEventListener('change', updateFontPreview);
+    document.getElementById('fontFamilyCJK').addEventListener('change', updateFontPreview);
+    document.getElementById('textColor').addEventListener('input', updateFontPreview);
+    document.getElementById('glowColor').addEventListener('input', updateFontPreview);
+    document.getElementById('enableGlow').addEventListener('change', () => {
+      updateGlowColor();
+      updateFontPreview();
+    });
 
     document.getElementById('saveBtn').addEventListener('click', async () => {
       const newConfig = collectForm();
       const success = await window.configManager.save(newConfig);
-      if (success) {
-        showStatus('配置已保存');
-      } else {
-        showStatus('保存失败', true);
-      }
+      showStatus(success ? '配置已保存，<a href="index.html" style="color: #00ffff;">点击查看效果</a>' : '保存失败', !success);
     });
 
     document.getElementById('resetBtn').addEventListener('click', async () => {
