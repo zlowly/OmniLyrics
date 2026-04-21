@@ -25,10 +25,11 @@ const (
 
 // Config 定义应用程序的配置结构。
 type Config struct {
-	Port      string      `mapstructure:"port"`
-	Log       LogConfig   `mapstructure:"log"`
-	CacheDir  string      `mapstructure:"cache-dir"`
-	ConfigDir string      `mapstructure:"config-dir"`
+	Port      string    `mapstructure:"port"`
+	Log       LogConfig `mapstructure:"log"`
+	CacheDir  string    `mapstructure:"cache-dir"`
+	ConfigDir string    `mapstructure:"config-dir"`
+	Mock      bool      `mapstructure:"mock"`
 }
 
 // LogConfig 定义日志相关的配置。
@@ -56,6 +57,8 @@ func initFlags() {
 	pflag.String("config-dir", "", "Config directory path (default: ./Config)")
 	// 配置文件参数
 	pflag.String("config", "", "Config file path (default: config.json in executable directory)")
+	// SMTC 模式参数
+	pflag.Bool("mock", false, "Force use mock SMTC backend")
 
 	// 将 pflag 绑定到 viper
 	viper.BindPFlags(pflag.CommandLine)
@@ -113,6 +116,9 @@ func loadConfig() (*Config, error) {
 	}
 	if pflag.CommandLine.Changed("config-dir") {
 		cfg.ConfigDir = viper.GetString("config-dir")
+	}
+	if pflag.CommandLine.Changed("mock") {
+		cfg.Mock = viper.GetBool("mock")
 	}
 
 	// 处理相对路径：相对于当前工作目录
@@ -282,4 +288,13 @@ func GetConfigDir() string {
 		return "Config"
 	}
 	return config.ConfigDir
+}
+
+// GetMock 返回是否强制使用 Mock SMTC 后端。
+// @return bool 是否强制使用 mock
+func GetMock() bool {
+	if config == nil {
+		return false
+	}
+	return config.Mock
 }

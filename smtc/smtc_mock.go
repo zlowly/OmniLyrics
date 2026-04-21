@@ -25,6 +25,7 @@ type Mock struct{}
 // NewMock 创建新的 Mock 实例。
 // @return *Mock 返回 Mock 指针
 func NewMock() *Mock {
+	fmt.Println("[SMTC] Mock backend initialized")
 	return &Mock{}
 }
 
@@ -61,9 +62,4 @@ func (m *Mock) GetData() (SMTCData, error) {
 		DurationMs: SongDurationMs,
 		HasSession: true,
 	}, nil
-}
-
-// init 在包初始化时输出提示信息，表示 Mock 后端已就绪
-func init() {
-	fmt.Println("[SMTC] Mock backend initialized")
 }

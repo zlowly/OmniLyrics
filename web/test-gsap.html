@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSAP Stagger Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        body {
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 30px;
+            color: #888;
+        }
+
+        #test-line {
+            font-size: 50px;
+            letter-spacing: 8px;
+        }
+
+        #test-line span {
+            display: inline-block;
+            background: linear-gradient(to right, rgb(255,255,255) 50%, rgb(60,60,60) 50%);
+            background-size: 200% 100%;
+            background-position-x: 100%;
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        button {
+            margin-top: 40px;
+            padding: 12px 32px;
+            font-size: 18px;
+            background: #0ff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0cc;
+        }
+    </style>
+</head>
+<body>
+    <h1>GSAP Stagger 逐字变亮测试（2秒间隔 + 柔和渐变）</h1>
+    <div id="test-line">
+        <span>一</span><span>笑</span><span>倾</span><span>城</span><span>一</span><span>笑</span><span>倾</span><span>城</span><span>汪</span><span>苏</span>
+    </div>
+    <button id="playBtn">播放动画</button>
+
+    <script>
+        const chars = document.querySelectorAll('#test-line span');
+        const playBtn = document.getElementById('playBtn');
+
+        playBtn.addEventListener('click', () => {
+            // 重置所有字为暗色
+            chars.forEach(char => {
+                char.style.backgroundPositionX = '100%';
+            });
+
+            // 逐字变亮动画
+            chars.forEach((char, i) => {
+                const delay = i * 2;  // 每字 2 秒间隔
+                
+                gsap.to(char, {
+                    backgroundPositionX: '0%',
+                    duration: 0.3,
+                    delay: delay,
+                    ease: 'power1.out'
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -349,11 +348,6 @@ func handleConfig(w http.ResponseWriter, r *http.Request, configDir string) {
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 		return
 	}
-}
-
-// init 在包初始化时输出提示信息，表示 HTTP 处理器已注册
-func init() {
-	fmt.Println("[Handlers] HTTP handlers initialized")
 }
 
 // handleFonts 处理获取系统字体列表的 HTTP 端点。

@@ -109,7 +109,18 @@ function parseLRCInternal(lrcText) {
             lines.push({ time: lineTimeMs, text: cleanText });
         }
     }
-    return lines.sort((a, b) => a.time - b.time);
+
+    // 计算每行的结束时间（下一行的开始时间）
+    const sorted = lines.sort((a, b) => a.time - b.time);
+    for (let i = 0; i < sorted.length - 1; i++) {
+        sorted[i].endTime = sorted[i + 1].time;
+    }
+    // 最后一行的结束时间默认为开始时间 + 2 秒
+    if (sorted.length > 0) {
+        sorted[sorted.length - 1].endTime = sorted[sorted.length - 1].time + 2000;
+    }
+
+    return sorted;
 }
 
 function cleanLRCInternal(lrc) {
@@ -134,6 +145,7 @@ class MotionEngine {
         this.currentIndex = 0;
         this.lastPosition = 0;
         this.lastTitle = '';
+        this.songDuration = 0;  // 歌曲总时长
         this.velocity = 0;
         this.frameData = {
             currentIndex: 0,
@@ -183,7 +195,8 @@ class MotionEngine {
 
     async processBackendData(data) {
         const position = data.position || 0;
-        const duration = data.duration || 0;
+        this.songDuration = data.duration || 0;
+        const duration = this.songDuration;
 
         // 检测换歌，重置重试计数和歌词
         if (data.title !== this.lastTitle) {

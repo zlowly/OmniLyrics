@@ -127,10 +127,10 @@ class KaraokeRenderer extends LyricsRendererBase {
         }
     }
 
-    // 更新字的辉光流动效果
+// 更新字的辉光流动效果
     // 逻辑：
     // - 当前字（刚唱到的字）：从初始亮度逐渐变到最亮
-    // - 已唱过的字：亮度逐渐衰减（辉光慢慢消失），但有下限
+    // - 已唱过的字：保持高亮不衰减
     // - 未唱的字：保持基础亮度
     updateWordGlowFlow(el, wordIndex, activeIndex, currentTimeMs, words) {
         if (!this.enableGlow) {
@@ -140,42 +140,33 @@ class KaraokeRenderer extends LyricsRendererBase {
         }
 
         const glowColor = this.glowColor;
-        const baseOpacity = 0.7;  // 基础亮度（与邻近非活动行一致）
-        const maxOpacity = 1.0;   // 最大亮度
-        const maxGlowSpread = 20; // 最大发光范围
-        const glowFadeTime = 800; // 辉光消失时间（毫秒）
+        const baseOpacity = 0.7;
+        const maxOpacity = 1.0;
+        const maxGlowSpread = 20;
 
         if (wordIndex < activeIndex) {
-            // 已唱过的字：辉光逐渐衰减
-            const wordTime = words[wordIndex].time;
-            const timeSinceSung = currentTimeMs - wordTime;
-            const fadeProgress = Math.min(timeSinceSung / glowFadeTime, 1);
-            
-            // 亮度从最亮逐渐衰减到基础亮度
-            const opacity = maxOpacity - (maxOpacity - baseOpacity) * fadeProgress;
-            
-            // 发光范围逐渐缩小到基础值
-            const glowSpread = maxGlowSpread - (maxGlowSpread - 4) * fadeProgress;
-            
-            el.style.opacity = opacity.toFixed(2);
-            el.style.textShadow = `0 0 ${glowSpread.toFixed(1)}px ${glowColor}`;
+            // 已唱过的字：保持高亮不衰减
+            el.style.opacity = maxOpacity.toFixed(2);
+            el.style.textShadow = `0 0 ${maxGlowSpread}px ${glowColor}`;
         } else if (wordIndex === activeIndex) {
-            // 当前正唱的字：逐渐变亮
-            const wordTime = words[wordIndex].time;
-            const timeSinceStart = currentTimeMs - wordTime;
-            const lightUpTime = 150; // 变亮时间（毫秒）
-            const lightUpProgress = Math.min(timeSinceStart / lightUpTime, 1);
-            
-            // 亮度从基础亮度变到最亮
-            const opacity = baseOpacity + (maxOpacity - baseOpacity) * lightUpProgress;
-            
-            // 发光范围从基础值逐渐扩大到最大值
-            const glowSpread = 4 + (maxGlowSpread - 4) * lightUpProgress;
-            
-            el.style.opacity = opacity.toFixed(2);
-            el.style.textShadow = `0 0 ${glowSpread.toFixed(1)}px ${glowColor}`;
+            // 当前正唱的字：从暗到亮动画
+            if (!el.dataset.animating) {
+                el.dataset.animating = 'true';
+                gsap.fromTo(el,
+                    { opacity: baseOpacity },
+                    {
+                        opacity: maxOpacity,
+                        textShadow: `0 0 ${maxGlowSpread}px ${glowColor}`,
+                        duration: 0.3,
+                        ease: 'power1.out',
+                        onComplete: () => {
+                            el.dataset.animating = 'false';
+                        }
+                    }
+                );
+            }
         } else {
-            // 未唱的字：保持基础亮度
+            // 未唱的字：基础亮度
             el.style.opacity = baseOpacity.toFixed(2);
             el.style.textShadow = `0 0 4px ${glowColor}`;
         }
