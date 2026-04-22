@@ -262,6 +262,40 @@
     }
     .status.success { color: #4caf50; }
     .status.error { color: var(--danger); }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: #444;
+      border-radius: 2px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--accent);
+      border-radius: 50%;
+      margin-top: -5px;
+      box-shadow: 0 0 4px var(--accent);
+    }
+    input[type="range"]::-moz-range-track {
+      height: 4px;
+      background: #444;
+      border-radius: 2px;
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      background: var(--accent);
+      border-radius: 50%;
+      border: none;
+      box-shadow: 0 0 4px var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -303,7 +337,7 @@
             <label>字体颜色</label>
             <input type="color" id="textColor" value="#ffffff">
             <span style="margin-left: 12px; font-size: 12px; color: #888;">透明度</span>
-            <input type="range" id="textOpacity" min="0" max="100" value="100" style="width: 60px; margin-left: 4px;">
+            <input type="range" id="textOpacity" min="0" max="100" value="100" style="width: 80px; margin-left: 4px;">
             <span id="textOpacityValue" style="font-size: 12px; color: #888; margin-left: 4px;">100%</span>
           </div>
           <div class="form-item">

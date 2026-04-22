@@ -80,9 +80,9 @@ class KaraokeRenderer extends LyricsRendererBase {
     }
 
     generateWordStyles() {
-        // 硬编码白色高亮，暗色为 40% 亮度
-        const highlight = { r: 255, g: 255, b: 255, a: 1 };
-        const dim = this.adjustBrightness(highlight, 0.4);
+        // 使用配置中的颜色，暗色为 60% 亮度
+        const highlight = this.textColor;
+        const dim = this.adjustBrightness(highlight, 0.6);
 
         const highlightStr = `rgba(${highlight.r}, ${highlight.g}, ${highlight.b}, ${highlight.a})`;
         const dimStr = `rgba(${dim.r}, ${dim.g}, ${dim.b}, ${dim.a})`;
