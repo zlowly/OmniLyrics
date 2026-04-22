@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,13 +26,13 @@
         }
 
         #test-line {
-            font-size: 50px;
+            font-size: 32px;
             letter-spacing: 8px;
         }
 
         #test-line span {
             display: inline-block;
-            background: linear-gradient(to right, rgb(255,255,255) 50%, rgb(60,60,60) 50%);
+            background: linear-gradient(to right, rgb(255, 255, 255) 50%, rgb(60, 60, 60) 50%);
             background-size: 200% 100%;
             background-position-x: 100%;
             background-clip: text;
@@ -54,8 +55,8 @@
         }
     </style>
 </head>
+
 <body>
-    <h1>GSAP Stagger 逐字变亮测试（2秒间隔 + 柔和渐变）</h1>
     <div id="test-line">
         <span>一</span><span>笑</span><span>倾</span><span>城</span><span>一</span><span>笑</span><span>倾</span><span>城</span><span>汪</span><span>苏</span>
     </div>
@@ -66,23 +67,21 @@
         const playBtn = document.getElementById('playBtn');
 
         playBtn.addEventListener('click', () => {
-            // 重置所有字为暗色
-            chars.forEach(char => {
-                char.style.backgroundPositionX = '100%';
-            });
+            const charDuration = 2; // 每个字变亮的过程时长，这里假设每个字都是2秒过程
 
-            // 逐字变亮动画
-            chars.forEach((char, i) => {
-                const delay = i * 2;  // 每字 2 秒间隔
-                
-                gsap.to(char, {
-                    backgroundPositionX: '0%',
-                    duration: 0.3,
-                    delay: delay,
-                    ease: 'power1.out'
-                });
+            // 3. 计算最终 Stagger，使得视觉上平滑
+            const stagger = charDuration * 0.8;
+
+            gsap.to(chars, {
+                backgroundPositionX: '0%',
+                duration: charDuration,
+                stagger: stagger,
+                ease: 'none',
+                overwrite: 'auto'
             });
         });
+
     </script>
 </body>
+
 </html>

@@ -197,6 +197,7 @@ class MotionEngine {
         const position = data.position || 0;
         this.songDuration = data.duration || 0;
         const duration = this.songDuration;
+        this.lastStatus = data.status || 'Unknown';
 
         // 检测换歌，重置重试计数和歌词
         if (data.title !== this.lastTitle) {
@@ -350,7 +351,8 @@ parseLRC(lrcText) {
             isInterlude,
             countdown: isInterlude ? Math.max(0, Math.ceil((curr.time - pos) / 1000)) : 0,
             velocity: this.velocity,
-            position: pos  // 添加当前播放位置（毫秒），用于逐字高亮
+            position: pos,
+            isPlaying: this.lastStatus === 'Playing'
         };
     }
 

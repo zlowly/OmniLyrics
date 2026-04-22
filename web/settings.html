@@ -302,6 +302,9 @@
           <div class="form-item">
             <label>字体颜色</label>
             <input type="color" id="textColor" value="#ffffff">
+            <span style="margin-left: 12px; font-size: 12px; color: #888;">透明度</span>
+            <input type="range" id="textOpacity" min="0" max="100" value="100" style="width: 60px; margin-left: 4px;">
+            <span id="textOpacityValue" style="font-size: 12px; color: #888; margin-left: 4px;">100%</span>
           </div>
           <div class="form-item">
             <label>背景色</label>
@@ -362,6 +365,10 @@
         <div class="form-item" id="glowColorWrapper" style="margin-top: 16px;">
           <label>发光颜色</label>
           <input type="color" id="glowColor" value="#00ffff">
+        </div>
+        <div class="form-item" id="glowIntensityWrapper" style="margin-top: 16px;">
+          <label>发光强度 (<span id="glowIntensityValue">1.0</span>)</label>
+          <input type="range" id="glowIntensity" min="0.5" max="2" step="0.1" value="1.0">
         </div>
       </div>
 
@@ -471,7 +478,7 @@
   <script>
     const DEFAULT_CONFIG = {
       mode: 'karaoke',
-      colors: { text: '#ffffff', glow: '#00ffff', bg: '#000000', enableGlow: true },
+      colors: { text: '#ffffff', glow: '#00ffff', bg: '#000000', enableGlow: true, glowIntensity: 1.0 },
       font: { size: '2.4rem', family: 'system-ui, -apple-system, Arial' },
       bg: { color: '#000000' },
       modeParams: {
@@ -499,8 +506,14 @@
         opt.querySelector('input').checked = opt.dataset.mode === mode;
       });
 
-      // 通用设置
-      document.getElementById('textColor').value = config.colors?.text || '#ffffff';
+      // 通用设置 - 解析颜色中的透明度
+      const textColorFull = config.colors?.text || '#ffffff';
+      const textColorHex = textColorFull.replace('#', '').slice(0, 6);
+      const textOpacityHex = textColorFull.replace('#', '').slice(6, 8) || 'ff';
+      const textOpacity = parseInt(textOpacityHex, 16) * 100 / 255;
+      
+      document.getElementById('textColor').value = '#' + textColorHex;
+      document.getElementById('textOpacity').value = textOpacity;
       document.getElementById('bgColor').value = config.bg?.color || '#000000';
       document.getElementById('fontSize').value = config.font?.size || '2.4rem';
 
@@ -515,6 +528,7 @@
 
       document.getElementById('enableGlow').checked = config.colors?.enableGlow !== false;
       document.getElementById('glowColor').value = config.colors?.glow || '#00ffff';
+      document.getElementById('glowIntensity').value = config.colors?.glowIntensity ?? 1.0;
 
       // 更新预览
       updateFontPreview();
@@ -592,8 +606,25 @@
         });
 
         // 恢复选中值，如果没有则使用传入的值
-        latinSelect.value = currentLatin || selectedLatin || 'Arial';
-        cjkSelect.value = currentCJK || selectedCJK || 'Microsoft YaHei';
+        const finalLatin = selectedLatin || currentLatin || 'Arial';
+        const finalCJK = selectedCJK || currentCJK || 'Microsoft YaHei';
+
+        // 确保值存在于列表中，如果不存在则添加
+        if (finalLatin && !fonts.find(f => f.name === finalLatin)) {
+          const opt = document.createElement('option');
+          opt.value = finalLatin;
+          opt.textContent = finalLatin;
+          latinSelect.appendChild(opt);
+        }
+        if (finalCJK && !fonts.find(f => f.name === finalCJK)) {
+          const opt = document.createElement('option');
+          opt.value = finalCJK;
+          opt.textContent = finalCJK;
+          cjkSelect.appendChild(opt);
+        }
+
+        latinSelect.value = finalLatin;
+        cjkSelect.value = finalCJK;
 
         // 如果保存的值不在列表中，添加到列表并选中
         if (selectedLatin && !fonts.find(f => f.name === selectedLatin)) {
@@ -620,14 +651,25 @@
     function updateFontPreview() {
       const latinFont = document.getElementById('fontFamilyLatin').value;
       const cjkFont = document.getElementById('fontFamilyCJK').value;
-      const textColor = document.getElementById('textColor').value;
+      const textColorHex = document.getElementById('textColor').value;
+      const textOpacity = parseInt(document.getElementById('textOpacity').value);
+      
+      document.getElementById('textOpacityValue').textContent = textOpacity + '%';
+      
+      // 合并颜色和透明度
+      const alphaHex = Math.round(textOpacity * 255 / 100).toString(16).padStart(2, '0');
+      const textColor = textColorHex + alphaHex;
+      
       const glowColor = document.getElementById('glowColor').value;
       const enableGlow = document.getElementById('enableGlow').checked;
+      const glowIntensity = parseFloat(document.getElementById('glowIntensity').value);
+
+      document.getElementById('glowIntensityValue').textContent = glowIntensity.toFixed(1);
 
       const preview = document.getElementById('fontPreview');
       preview.style.fontFamily = `"${latinFont}", "${cjkFont}", sans-serif`;
       preview.style.color = textColor;
-      preview.style.textShadow = enableGlow ? `0 0 10px ${glowColor}` : 'none';
+      preview.style.textShadow = enableGlow ? `0 0 ${10 * glowIntensity}px ${glowColor}` : 'none';
     }
 
     // 收集表单数据
@@ -635,13 +677,20 @@
       const mode = document.querySelector('.mode-option.active').dataset.mode;
       const latinFont = document.getElementById('fontFamilyLatin').value;
       const cjkFont = document.getElementById('fontFamilyCJK').value;
+      // 合并颜色和透明度
+      const textColorHex = document.getElementById('textColor').value;
+      const textOpacity = parseInt(document.getElementById('textOpacity').value);
+      const alphaHex = Math.round(textOpacity * 255 / 100).toString(16).padStart(2, '0');
+      const textColor = textColorHex + alphaHex;
+      
       return {
         mode: mode,
         colors: {
-          text: document.getElementById('textColor').value,
+          text: textColor,
           glow: document.getElementById('glowColor').value,
           bg: document.getElementById('bgColor').value,
-          enableGlow: document.getElementById('enableGlow').checked
+          enableGlow: document.getElementById('enableGlow').checked,
+          glowIntensity: parseFloat(document.getElementById('glowIntensity').value)
         },
         font: {
           size: document.getElementById('fontSize').value,
@@ -712,7 +761,9 @@
     document.getElementById('fontFamilyLatin').addEventListener('change', updateFontPreview);
     document.getElementById('fontFamilyCJK').addEventListener('change', updateFontPreview);
     document.getElementById('textColor').addEventListener('input', updateFontPreview);
+    document.getElementById('textOpacity').addEventListener('input', updateFontPreview);
     document.getElementById('glowColor').addEventListener('input', updateFontPreview);
+    document.getElementById('glowIntensity').addEventListener('input', updateFontPreview);
     document.getElementById('enableGlow').addEventListener('change', () => {
       updateGlowColor();
       updateFontPreview();

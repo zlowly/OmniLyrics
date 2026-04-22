@@ -3,6 +3,11 @@ class KaraokeRenderer extends LyricsRendererBase {
         super(container, stage, config);
         this.interludeEl = null;
         this.params = config?.modeParams?.karaoke || {};
+        this.wordTimeline = null;
+        this.wasPlaying = true;
+        this.config = config || {};
+        this.textColor = { r: 255, g: 255, b: 255, a: 1 };
+        this.lastGlowIndex = -1;
     }
 
     getDefaultConfig() {
@@ -19,20 +24,89 @@ class KaraokeRenderer extends LyricsRendererBase {
     }
 
     initStyles() {
-        const colors = window.configManager?.getColors() || {};
-        const font = window.configManager?.getFont() || {};
-        
+        this.config = window.configManager?.get() || {};
+        const colors = this.config.colors || {};
+        const font = this.config.font || {};
+
+        // 发光配置
+        this.glowColor = colors.glow || '#00ffff';
+        this.glowIntensity = colors.glowIntensity ?? 1.0;
+        this.enableGlow = false; // 禁用发光
+
+        // 解析文字颜色
+        this.textColor = this.parseColor(colors.text || '#ffffff');
+
         document.documentElement.style.setProperty('--fg', colors.text || '#ffffff');
-        document.documentElement.style.setProperty('--glow', colors.glow || 'rgba(0,255,255,.9)');
-        
+
         // 应用字体设置
         const fontFamily = font?.family || 'system-ui, -apple-system, Arial';
         const fontSize = font?.size || '2.4rem';
         document.documentElement.style.setProperty('--font-family', fontFamily);
         document.documentElement.style.setProperty('--font-size', fontSize);
-        
-        this.enableGlow = colors.enableGlow !== false;
-        this.glowColor = colors.glow || '#00ffff';
+
+        // 生成样式：每个字使用 gradient 实现变亮效果
+        this.generateWordStyles();
+    }
+
+    // 解析颜色（支持 #RRGGBB 和 #RRGGBBAA）
+    parseColor(color) {
+        if (!color) return { r: 255, g: 255, b: 255, a: 1 };
+
+        const hex = color.replace('#', '');
+        if (hex.length === 8) {
+            return {
+                r: parseInt(hex.slice(0, 2), 16),
+                g: parseInt(hex.slice(2, 4), 16),
+                b: parseInt(hex.slice(4, 6), 16),
+                a: parseInt(hex.slice(6, 8), 16) / 255
+            };
+        }
+        return {
+            r: parseInt(hex.slice(0, 2), 16),
+            g: parseInt(hex.slice(2, 4), 16),
+            b: parseInt(hex.slice(4, 6), 16),
+            a: 1
+        };
+    }
+
+    // 调整亮度但保持透明度
+    adjustBrightness(color, factor) {
+        return {
+            r: Math.round(color.r * factor),
+            g: Math.round(color.g * factor),
+            b: Math.round(color.b * factor),
+            a: color.a
+        };
+    }
+
+    generateWordStyles() {
+        // 硬编码白色高亮，暗色为 40% 亮度
+        const highlight = { r: 255, g: 255, b: 255, a: 1 };
+        const dim = this.adjustBrightness(highlight, 0.4);
+
+        const highlightStr = `rgba(${highlight.r}, ${highlight.g}, ${highlight.b}, ${highlight.a})`;
+        const dimStr = `rgba(${dim.r}, ${dim.g}, ${dim.b}, ${dim.a})`;
+
+        // 动态插入样式，使用更高优先级
+        let styleEl = document.getElementById('karaoke-word-styles');
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'karaoke-word-styles';
+            document.head.appendChild(styleEl);
+        }
+
+        // 使用内联样式确保不被 CSS 覆盖
+        styleEl.textContent = `
+            .karaoke-word {
+                display: inline-block;
+                background: linear-gradient(to right, ${highlightStr} 50%, ${dimStr} 50%);
+                background-size: 200% 100%;
+                background-position: 100% 0;
+                -webkit-background-clip: text;
+                background-clip: text;
+                color: transparent;
+            }
+        `;
     }
 
     render(frameData) {
@@ -45,16 +119,83 @@ class KaraokeRenderer extends LyricsRendererBase {
         const line = motion.lrcData[frameData.currentIndex] || motion.lrcData[0];
         if (!line) return;
 
-        if (this.lastLineIndex !== frameData.currentIndex) {
-            this.lastLineIndex = frameData.currentIndex;
-            // 优先使用逐字时间戳，如果没有则从文本拆分
+        const { position, isPlaying, currentIndex } = frameData;
+
+        // 换行检测 - 创建新 timeline
+        if (this.lastLineIndex !== currentIndex) {
+            this.lastLineIndex = currentIndex;
             const words = line.words || this.splitTextToWords(line.text);
             this.renderNewLine(line.text, words, line.time);
+
+            // 有逐字时间戳时创建 timeline
+            if (line.words && line.words.length > 0) {
+                this.createWordTimeline(words, line.time);
+                
+                // 首次加载时根据进度设置状态
+                const currentPos = frameData.position;
+                const totalDuration = this.wordTimeline.duration() * 1000;
+                const targetTime = (currentPos - line.time) / 1000;
+                if (targetTime > 0 && targetTime < this.wordTimeline.duration()) {
+                    this.wordTimeline.seek(targetTime);
+                }
+                if (isPlaying) {
+                    this.wordTimeline.play();
+                }
+            } else {
+                this.wordTimeline = null;
+            }
         }
 
-        this.updateWordProgressByTime(frameData, line);
-        this.applyMotionBlur(frameData.velocity);
+        // 处理逐字 timeline
+        if (this.wordTimeline) {
+            const lineStartTime = this.currentLineStartTime;
+            const currentPos = frameData.position;
+
+            // 检测进度条拖动到其他行
+            const lastWord = this.currentWords[this.currentWords.length - 1];
+            const lastWordTime = lastWord?.time || 0;
+            if (currentPos < lineStartTime || (lastWordTime > 0 && currentPos > lastWordTime + 500)) {
+                this.renderInterlude(frameData);
+                return;
+            }
+
+            // 暂停状态：用 progress 同步
+            if (!isPlaying) {
+                const progress = Math.max(0, Math.min(1, (currentPos - lineStartTime) / (this.wordTimeline.duration() * 1000)));
+                this.wordTimeline.progress(progress);
+                this.wordTimeline.pause();
+            } else if (!this.wasPlaying) {
+                // 从暂停恢复播放时
+                this.wordTimeline.play();
+            }
+            this.wasPlaying = isPlaying;
+        }
+
         this.renderInterlude(frameData);
+    }
+
+    createWordTimeline(words, lineStartTime) {
+        const tl = gsap.timeline({ paused: true });
+
+        words.forEach((word, i) => {
+            const el = this.wordElements[i];
+            // 设置正确的初始背景位置
+            el.style.backgroundPositionX = '100%';
+
+            const duration = i === 0
+                ? (words[0].time - lineStartTime) / 1000
+                : (words[i].time - words[i - 1].time) / 1000;
+            const adjustedDuration = Math.max(duration, 0.1);
+
+            // 只做变亮动画，无发光
+            tl.to(el, {
+                backgroundPositionX: '0%',
+                duration: adjustedDuration,
+                ease: 'none'
+            });
+        });
+
+        this.wordTimeline = tl;
     }
 
     // 将文本拆分为单词数组（用于没有逐字时间戳的情况）
@@ -77,17 +218,13 @@ class KaraokeRenderer extends LyricsRendererBase {
         this.container.innerHTML = '';
         this.wordElements = [];
 
-        // 如果有逐字时间戳，为每个字设置时间
+        // 创建每个字的元素
         words.forEach((word, i) => {
             const span = document.createElement('span');
-            span.className = 'word';
+            span.className = 'karaoke-word';
             span.textContent = word.text;
-            span.dataset.index = i;
-            span.dataset.visible = 'false';
-            // 如果有逐字时间戳，存储时间信息
-            if (word.time !== undefined) {
-                span.dataset.time = word.time;
-            }
+            // 初始为暗色
+            span.style.backgroundPositionX = '100%';
             this.container.appendChild(span);
             this.wordElements.push(span);
         });
@@ -96,121 +233,6 @@ class KaraokeRenderer extends LyricsRendererBase {
             { opacity: 0, y: 20, rotateX: -15 },
             { opacity: 1, y: 0, rotateX: 0, duration: this.params.animationDuration || 0.4, ease: 'power2.out' }
         );
-    }
-
-    // 基于时间的进度更新（支持逐字时间戳）
-    updateWordProgressByTime(frameData, line) {
-        const total = this.wordElements.length;
-        if (!total) return;
-
-        // 如果有逐字时间戳，基于当前播放位置计算进度
-        if (line.words && line.words.length > 0) {
-            const currentTimeMs = frameData.position;
-            const words = line.words;
-
-            // 找到当前活跃的字索引
-            let activeIndex = -1;
-            for (let i = 0; i < words.length; i++) {
-                if (currentTimeMs >= words[i].time) {
-                    activeIndex = i;
-                } else {
-                    break;
-                }
-            }
-
-            this.wordElements.forEach((el, i) => {
-                this.updateWordGlowFlow(el, i, activeIndex, currentTimeMs, words);
-            });
-        } else {
-            // 没有逐字时间戳，使用原来的进度百分比方式
-            this.updateWordProgress(frameData.lineProgress);
-        }
-    }
-
-// 更新字的辉光流动效果
-    // 逻辑：
-    // - 当前字（刚唱到的字）：从初始亮度逐渐变到最亮
-    // - 已唱过的字：保持高亮不衰减
-    // - 未唱的字：保持基础亮度
-    updateWordGlowFlow(el, wordIndex, activeIndex, currentTimeMs, words) {
-        if (!this.enableGlow) {
-            el.style.textShadow = 'none';
-            el.style.opacity = '1';
-            return;
-        }
-
-        const glowColor = this.glowColor;
-        const baseOpacity = 0.7;
-        const maxOpacity = 1.0;
-        const maxGlowSpread = 20;
-
-        if (wordIndex < activeIndex) {
-            // 已唱过的字：保持高亮不衰减
-            el.style.opacity = maxOpacity.toFixed(2);
-            el.style.textShadow = `0 0 ${maxGlowSpread}px ${glowColor}`;
-        } else if (wordIndex === activeIndex) {
-            // 当前正唱的字：从暗到亮动画
-            if (!el.dataset.animating) {
-                el.dataset.animating = 'true';
-                gsap.fromTo(el,
-                    { opacity: baseOpacity },
-                    {
-                        opacity: maxOpacity,
-                        textShadow: `0 0 ${maxGlowSpread}px ${glowColor}`,
-                        duration: 0.3,
-                        ease: 'power1.out',
-                        onComplete: () => {
-                            el.dataset.animating = 'false';
-                        }
-                    }
-                );
-            }
-        } else {
-            // 未唱的字：基础亮度
-            el.style.opacity = baseOpacity.toFixed(2);
-            el.style.textShadow = `0 0 4px ${glowColor}`;
-        }
-    }
-
-    updateWordProgress(progress) {
-        const total = this.wordElements.length;
-        if (!total) return;
-
-        const activeCount = Math.floor(progress * total);
-        this.wordElements.forEach((el, i) => {
-            const isVisible = i <= activeCount;
-            const isCurrent = i === activeCount;
-
-            if (el.dataset.visible !== isVisible.toString()) {
-                el.dataset.visible = isVisible.toString();
-                if (isVisible && this.params.wordAnimation && this.enableGlow) {
-                    this.animateWordGlow(el, isCurrent);
-                }
-            }
-        });
-    }
-
-    animateWordGlow(el, isCurrent) {
-        const scale = isCurrent ? (this.params.currentScale || 1.05) : 1;
-        const glowColor = this.glowColor;
-
-        window.gsap.to(el, {
-            textShadow: `0 0 ${isCurrent ? 12 : 6}px ${glowColor}`,
-            duration: this.params.animationDuration || 0.3,
-            ease: 'power1.out'
-        });
-
-        if (isCurrent) {
-            window.gsap.fromTo(el,
-                { scale: 1, z: 0 },
-                { scale: scale, z: 5, duration: 0.15, yoyo: true, repeat: 1 }
-            );
-        }
-    }
-
-    applyMotionBlur(velocity) {
-        const blurAmount = Math.min(velocity * 0.1, 3);
-        this.container.style.filter = `blur(${blurAmount.toFixed(2)}px)`;
     }
 
     renderInterlude(frameData) {

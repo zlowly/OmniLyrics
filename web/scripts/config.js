@@ -10,7 +10,8 @@ const SETTINGS_DEFAULT_CONFIG = {
         text: '#ffffff',
         glow: '#00ffff',
         bg: '#000000',
-        enableGlow: true
+        enableGlow: true,
+        glowIntensity: 1.0
     },
     font: {
         size: '2.4rem',
