@@ -1,4 +1,4 @@
-﻿# --- 0. 环境准备 ---
+# --- 0. 环境准备 ---
 [void][Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime]
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 Add-Type -AssemblyName System.Web
@@ -173,9 +173,10 @@ $defaultConfig = @{
                         mode = "karaoke"
                         colors = @{
                             text = "#ffffff"
-                            glow = "#00ffff"
                             bg = "#000000"
-                            enableGlow = $true
+                            glowRange = 1
+                            outlineWidth = 1
+                            outlineColor = "#ffffff"
                         }
                         font = @{
                             size = "2.4rem"

@@ -8,10 +8,10 @@ const SETTINGS_DEFAULT_CONFIG = {
     mode: 'karaoke',
     colors: {
         text: '#ffffff',
-        glow: '#00ffff',
         bg: '#000000',
-        enableGlow: true,
-        glowIntensity: 1.0
+        glowRange: 1,
+        outlineWidth: 1,
+        outlineColor: '#ffffff'
     },
     font: {
         size: '2.4rem',

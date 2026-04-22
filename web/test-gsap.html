@@ -39,7 +39,6 @@
             background-clip: text;
             -webkit-background-clip: text;
             color: transparent;
-            text-shadow: none;  /* 初始无发光 */
         }
 
         button {
@@ -100,16 +99,6 @@
                     duration: duration,
                     ease: 'none'
                 }, startTime);
-                tl.to(char, {
-                    textShadow: '0 0 30px rgba(255,255,0,1)',
-                    duration: duration,
-                    ease: 'none'
-                }, startTime);
-                tl.to(char, {
-                    textShadow: '0 0 0px rgba(255,255,0,0)',
-                    duration: 1,
-                    ease: 'none'
-                }, startTime + duration);
             });
 
             tl.play();

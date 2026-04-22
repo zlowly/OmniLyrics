@@ -81,7 +81,7 @@ type CacheRequest struct {
 	// Artist 艺术家名称
 	Artist string `json:"artist"`
 	// LRC 歌词内容（LRC 格式）
-	LRC string `json:"lrc_content"`
+	LRC string `json:"lrc"`
 }
 
 // handleCheckCacheWrapper 创建处理歌词检查请求的 HTTP 处理器。
@@ -291,10 +291,11 @@ func handleConfig(w http.ResponseWriter, r *http.Request, configDir string) {
 			defaultConfig := map[string]interface{}{
 				"mode": "karaoke",
 				"colors": map[string]interface{}{
-					"text":       "#ffffff",
-					"glow":       "#00ffff",
-					"bg":         "#000000",
-					"enableGlow": true,
+					"text":          "#ffffff",
+					"bg":            "#000000",
+					"glowRange":     1,
+					"outlineWidth":  1,
+					"outlineColor": "#ffffff",
 				},
 				"font": map[string]interface{}{
 					"size":   "2.4rem",

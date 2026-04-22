@@ -8,7 +8,6 @@
     :root {
       --bg: rgba(0,0,0,0);
       --fg: #ffffff;
-      --glow: rgba(0,255,255,.9);
       --font-family: system-ui, -apple-system, Arial, sans-serif;
       --font-size: 2.4rem;
     }
@@ -45,9 +44,7 @@
     .line { font-size: var(--font-size); line-height: 1.15; text-align: center; white-space: nowrap; font-family: var(--font-family); }
     .word { display: inline-block; opacity: 0.0; filter: blur(0.0px); font-family: var(--font-family); }
     .word[data-visible="true"] {
-      opacity: 1; text-shadow: 0 0 4px var(--glow);
-      --g: 1;
-      text-shadow: 0 0 calc(var(--g) * 6px) rgba(0,255,255,.8);
+      opacity: 1;
       transform: translateZ(0.1px);
     }
     .shadow { text-shadow: 0 2px 6px rgba(0,0,0,.4); }

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 // main 是程序的入口点，启动 HTTP 服务器并注册所有路由处理器。
@@ -105,10 +108,31 @@ func main() {
 	log.Printf("[Info] Cache dir: %s", cacheDir)
 	log.Printf("[Info] Config dir: %s", configDir)
 
-	// 启动 HTTP 服务器并阻塞
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Printf("[Error] Server error: %v", err)
+	// 创建带超时的上下文，用于优雅关闭
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// 启动 HTTP 服务器
+	server := &http.Server{Addr: addr, Handler: nil}
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("[Error] Server error: %v", err)
+		}
+	}()
+
+	// 监听退出信号：HTTP shutdown 或系统信号
+	select {
+	case <-ctx.Done():
+		log.Println("[Info] Signal received, stopping server...")
+	case <-shutdownCh:
+		log.Println("[Info] Shutdown requested via HTTP, stopping server...")
 	}
+
+	// 强制关闭服务器，立即中断所有连接
+	if err := server.Close(); err != nil {
+		log.Printf("[Error] Server close error: %v", err)
+	}
+	log.Println("[Info] Server stopped")
 }
 
 // getBaseDir 获取程序的基础目录。
@@ -128,24 +152,16 @@ func getBaseDir() string {
 	return "."
 }
 
-// serverRunning 标志位，用于跟踪服务器运行状态
-var serverRunning = true
+// shutdownCh 用于协调关闭信号（HTTP shutdown 或系统信号）
+var shutdownCh = make(chan struct{})
 
 // handleShutdown 处理关机请求的 HTTP 端点。
-// 接受 POST 请求或带有 confirm=1 查询参数的请求，执行服务器关闭。
+// 接受 GET、POST 等所有 HTTP 方法，执行服务器关闭。
 // @param w HTTP 响应写入器
 // @param r HTTP 请求对象
 func handleShutdown(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "POST" || r.URL.Query().Get("confirm") == "1" {
-		w.Write([]byte(`{"status":"shutting_down"}`))
-		serverRunning = false
-		// 在 goroutine 中执行退出，避免阻塞 HTTP 响应
-		go func() {
-			log.Println("[Info] Shutdown requested")
-			os.Exit(0)
-		}()
-	}
-	w.Write([]byte(`{"status":"ok"}`))
+	w.Write([]byte(`{"status":"shutting_down"}`))
+	close(shutdownCh)
 }
 
 // handleIndex 处理 index.html 文件请求的 HTTP 端点。

@@ -16,7 +16,6 @@ class LyricsRenderer {
     initStyles() {
         document.documentElement.style.setProperty('--bg', 'rgba(0,0,0,0)');
         document.documentElement.style.setProperty('--fg', '#ffffff');
-        document.documentElement.style.setProperty('--glow', 'rgba(0,255,255,.9)');
     }
 
     render(frameData) {

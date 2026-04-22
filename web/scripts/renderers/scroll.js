@@ -22,7 +22,6 @@ class ScrollRenderer extends LyricsRendererBase {
     initStyles() {
         const colors = window.configManager?.getColors() || {};
         document.documentElement.style.setProperty('--fg', colors.text || '#ffffff');
-        document.documentElement.style.setProperty('--glow', colors.glow || 'rgba(0,255,255,.9)');
     }
 
     render(frameData) {

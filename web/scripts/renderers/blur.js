@@ -26,9 +26,10 @@ class BlurRenderer extends LyricsRendererBase {
     initStyles() {
         const colors = window.configManager?.getColors() || {};
         document.documentElement.style.setProperty('--fg', colors.text || '#ffffff');
-        document.documentElement.style.setProperty('--glow', colors.glow || 'rgba(0,255,255,.9)');
-        this.glowColor = colors.glow || '#00ffff';
-        this.enableGlow = colors.enableGlow !== false;
+        this.textColor = colors.text || '#ffffff';
+        this.glowRange = colors.glowRange ?? 1;
+        this.outlineWidth = colors.outlineWidth ?? 1;
+        this.outlineColor = colors.outlineColor || '#ffffff';
     }
 
     getLineHeight() {
@@ -65,7 +66,6 @@ class BlurRenderer extends LyricsRendererBase {
     renderBlurLines(currentIdx, lines, visibleLines, prevIdx) {
         this.lineHeight = this.getLineHeight();
         const halfLines = Math.floor(visibleLines / 2);
-        const glowColor = this.glowColor;
         const duration = this.params.scrollDuration || 0.5;
 
         this.container.style.height = `${this.lineHeight * visibleLines}px`;
@@ -99,6 +99,9 @@ class BlurRenderer extends LyricsRendererBase {
             lineEl.style.willChange = 'transform, opacity, filter';
             lineEl.style.zIndex = (lineIdx === currentIdx) ? '10' : String(visibleLines - Math.abs(i - halfLines));
 
+            const textShadow = (relativeIdx === 0 && this.glowRange > 0) ? `0 0 ${this.glowRange}px ${this.textColor}` : 'none';
+            const textStroke = (relativeIdx === 0 && this.outlineWidth > 0) ? `${this.outlineWidth}px ${this.outlineColor}` : 'none';
+
             if (prevIdx !== undefined && prevIdx !== currentIdx) {
                 const prevRelativeIdx = lineIdx - prevIdx;
                 const prevTop = (prevRelativeIdx + halfLines) * this.lineHeight;
@@ -110,14 +113,16 @@ class BlurRenderer extends LyricsRendererBase {
                 lineEl.style.opacity = prevOpacity;
                 lineEl.style.filter = 'blur(' + prevBlur + 'px)';
                 lineEl.style.transform = 'translateX(-50%) scale(' + prevScale + ')';
-                lineEl.style.textShadow = (prevRelativeIdx === 0 && this.enableGlow) ? '0 0 15px ' + glowColor : 'none';
+                lineEl.style.textShadow = (prevRelativeIdx === 0 && this.glowRange > 0) ? `0 0 ${this.glowRange}px ${this.textColor}` : 'none';
+                lineEl.style.webkitTextStroke = (prevRelativeIdx === 0 && this.outlineWidth > 0) ? `${this.outlineWidth}px ${this.outlineColor}` : 'none';
 
                 window.gsap.to(lineEl, {
                     top: targetTop,
                     opacity: targetOpacity,
                     scale: targetScale,
                     filter: 'blur(' + targetBlur + 'px)',
-                    textShadow: (relativeIdx === 0 && this.enableGlow) ? '0 0 15px ' + glowColor : 'none',
+                    textShadow: textShadow,
+                    webkitTextStroke: textStroke,
                     duration: duration,
                     ease: 'linear',
                     overwrite: 'auto'
@@ -127,7 +132,8 @@ class BlurRenderer extends LyricsRendererBase {
                 lineEl.style.opacity = targetOpacity;
                 lineEl.style.filter = 'blur(' + targetBlur + 'px)';
                 lineEl.style.transform = 'translateX(-50%) scale(' + targetScale + ')';
-                lineEl.style.textShadow = (relativeIdx === 0 && this.enableGlow) ? '0 0 15px ' + glowColor : 'none';
+                lineEl.style.textShadow = textShadow;
+                lineEl.style.webkitTextStroke = textStroke;
             }
 
             this.container.appendChild(lineEl);

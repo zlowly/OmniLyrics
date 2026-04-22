@@ -28,11 +28,10 @@ class KaraokeRenderer extends LyricsRendererBase {
         const colors = this.config.colors || {};
         const font = this.config.font || {};
 
-        // 发光配置
-        this.glowColor = colors.glow || '#00ffff';
-        this.glowIntensity = colors.glowIntensity ?? 1.0;
-        //this.enableGlow = colors.enableGlow ?? true; // 禁用发光
-        this.enableGlow = false; // 禁用发光
+        // 发光与轮廓配置
+        this.glowRange = colors.glowRange ?? 1;
+        this.outlineWidth = colors.outlineWidth ?? 1;
+        this.outlineColor = colors.outlineColor || '#ffffff';
 
         // 解析文字颜色
         this.textColor = this.parseColor(colors.text || '#ffffff');
@@ -166,9 +165,11 @@ class KaraokeRenderer extends LyricsRendererBase {
                 const progress = Math.max(0, Math.min(1, (currentPos - lineStartTime) / (this.wordTimeline.duration() * 1000)));
                 this.wordTimeline.progress(progress);
                 this.wordTimeline.pause();
-            } else if (!this.wasPlaying) {
-                // 从暂停恢复播放时
-                this.wordTimeline.play();
+            } else {
+                // 播放状态：确保 timeline 在运行（处理首次播放或从暂停恢复）
+                if (this.wordTimeline.paused() || !this.wasPlaying) {
+                    this.wordTimeline.play();
+                }
             }
             this.wasPlaying = isPlaying;
         }
@@ -178,45 +179,34 @@ class KaraokeRenderer extends LyricsRendererBase {
 
     createWordTimeline(words, lineStartTime) {
         const tl = gsap.timeline({ paused: true });
-        const glowColorParsed = this.parseColor(this.glowColor);
-        const glowR = glowColorParsed.r;
-        const glowG = glowColorParsed.g;
-        const glowB = glowColorParsed.b;
-        const glowAmount = 15 * this.glowIntensity;
-        const glowFadeDuration = 1.0;
 
-        let startTime = 0;
+        const textColorStr = `rgba(${this.textColor.r}, ${this.textColor.g}, ${this.textColor.b}, ${this.textColor.a})`;
 
         words.forEach((word, i) => {
             const el = this.wordElements[i];
             // 设置正确的初始背景位置
             el.style.backgroundPositionX = '100%';
-            el.style.textShadow = 'none';
+
+            // 应用静态发光和轮廓
+            let styles = [];
+            if (this.glowRange > 0) {
+                styles.push(`0 0 ${this.glowRange}px ${textColorStr}`);
+            }
+            el.style.textShadow = styles.length > 0 ? styles.join(', ') : 'none';
+            if (this.outlineWidth > 0) {
+                el.style.webkitTextStroke = `${this.outlineWidth}px ${this.outlineColor}`;
+            }
 
             const duration = i === 0
                 ? (words[0].time - lineStartTime) / 1000
                 : (words[i].time - words[i - 1].time) / 1000;
             const adjustedDuration = Math.max(duration, 0.1);
-            // 只做变亮动画，无发光
-            startTime = tl.to(el, {
+            // 只做变亮动画
+            tl.to(el, {
                 backgroundPositionX: '0%',
                 duration: adjustedDuration,
                 ease: 'none'
-            }).startTime();
-            if (this.enableGlow) {
-                // 阶段2：同时添加发光（透明度从 0→1，快速出现）
-                tl.to(el, {
-                    textShadow: `0 0 ${glowAmount}px rgba(${glowR},${glowG},${glowB},1)`,
-                    duration: adjustedDuration,
-                    ease: 'none'
-                }, startTime);
-                // 阶段3：变亮完成后，发光透明度 1→0（持续1秒）
-                tl.to(el, {
-                    textShadow: `0 0 ${glowAmount}px rgba(${glowR},${glowG},${glowB},0)`,
-                    duration: 2,
-                    ease: 'none'
-                }, startTime + adjustedDuration);
-            }
+            });
         });
 
         this.wordTimeline = tl;

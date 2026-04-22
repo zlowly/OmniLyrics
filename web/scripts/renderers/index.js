@@ -36,7 +36,6 @@ class RendererManager {
         }
 
         document.documentElement.style.setProperty('--fg', colors?.text || '#ffffff');
-        document.documentElement.style.setProperty('--glow', colors?.glow || 'rgba(0,255,255,.9)');
 
         // 设置字体
         const fontFamily = font?.family || 'system-ui, -apple-system, Arial';

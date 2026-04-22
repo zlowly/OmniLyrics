@@ -386,23 +386,20 @@
         </div>
       </div>
 
-      <!-- 发光效果 -->
+      <!-- 发光与轮廓 -->
       <div class="card">
-        <div class="card-title">发光效果</div>
-        <div class="switch-wrapper">
-          <span class="switch-label">启用发光效果</span>
-          <label class="switch">
-            <input type="checkbox" id="enableGlow" checked>
-            <span class="switch-slider"></span>
-          </label>
+        <div class="card-title">发光与轮廓</div>
+        <div class="form-item">
+          <label>发光范围 (<span id="glowRangeValue">1</span>)</label>
+          <input type="range" id="glowRange" min="0" max="20" step="1" value="1">
         </div>
-        <div class="form-item" id="glowColorWrapper" style="margin-top: 16px;">
-          <label>发光颜色</label>
-          <input type="color" id="glowColor" value="#00ffff">
+        <div class="form-item" style="margin-top: 16px;">
+          <label>轮廓宽度 (<span id="outlineWidthValue">1</span>)</label>
+          <input type="range" id="outlineWidth" min="0" max="10" step="1" value="1">
         </div>
-        <div class="form-item" id="glowIntensityWrapper" style="margin-top: 16px;">
-          <label>发光强度 (<span id="glowIntensityValue">1.0</span>)</label>
-          <input type="range" id="glowIntensity" min="0.5" max="2" step="0.1" value="1.0">
+        <div class="form-item" style="margin-top: 16px;">
+          <label>轮廓颜色</label>
+          <input type="color" id="outlineColor" value="#ffffff">
         </div>
       </div>
 
@@ -512,7 +509,7 @@
   <script>
     const DEFAULT_CONFIG = {
       mode: 'karaoke',
-      colors: { text: '#ffffff', glow: '#00ffff', bg: '#000000', enableGlow: true, glowIntensity: 1.0 },
+      colors: { text: '#ffffff', bg: '#000000', glowRange: 1, outlineWidth: 1, outlineColor: '#ffffff' },
       font: { size: '2.4rem', family: 'system-ui, -apple-system, Arial' },
       bg: { color: '#000000' },
       modeParams: {
@@ -560,9 +557,11 @@
       // 从后端获取系统字体列表并填充下拉框
       await loadSystemFonts(latinFont, cjkFont);
 
-      document.getElementById('enableGlow').checked = config.colors?.enableGlow !== false;
-      document.getElementById('glowColor').value = config.colors?.glow || '#00ffff';
-      document.getElementById('glowIntensity').value = config.colors?.glowIntensity ?? 1.0;
+      document.getElementById('glowRange').value = config.colors?.glowRange ?? 1;
+      document.getElementById('glowRangeValue').textContent = document.getElementById('glowRange').value;
+      document.getElementById('outlineWidth').value = config.colors?.outlineWidth ?? 1;
+      document.getElementById('outlineWidthValue').textContent = document.getElementById('outlineWidth').value;
+      document.getElementById('outlineColor').value = config.colors?.outlineColor || '#ffffff';
 
       // 更新预览
       updateFontPreview();
@@ -694,16 +693,26 @@
       const alphaHex = Math.round(textOpacity * 255 / 100).toString(16).padStart(2, '0');
       const textColor = textColorHex + alphaHex;
       
-      const glowColor = document.getElementById('glowColor').value;
-      const enableGlow = document.getElementById('enableGlow').checked;
-      const glowIntensity = parseFloat(document.getElementById('glowIntensity').value);
+      const glowRange = parseInt(document.getElementById('glowRange').value);
+      const outlineWidth = parseInt(document.getElementById('outlineWidth').value);
+      const outlineColor = document.getElementById('outlineColor').value;
 
-      document.getElementById('glowIntensityValue').textContent = glowIntensity.toFixed(1);
+      document.getElementById('glowRangeValue').textContent = glowRange;
+      document.getElementById('outlineWidthValue').textContent = outlineWidth;
 
       const preview = document.getElementById('fontPreview');
       preview.style.fontFamily = `"${latinFont}", "${cjkFont}", sans-serif`;
       preview.style.color = textColor;
-      preview.style.textShadow = enableGlow ? `0 0 ${10 * glowIntensity}px ${glowColor}` : 'none';
+      let previewShadow = '';
+      if (glowRange > 0) {
+        previewShadow = `0 0 ${glowRange}px ${textColor}`;
+      }
+      preview.style.textShadow = previewShadow;
+      if (outlineWidth > 0) {
+        preview.style.webkitTextStroke = `${outlineWidth}px ${outlineColor}`;
+      } else {
+        preview.style.webkitTextStroke = 'none';
+      }
     }
 
     // 收集表单数据
@@ -721,10 +730,10 @@
         mode: mode,
         colors: {
           text: textColor,
-          glow: document.getElementById('glowColor').value,
           bg: document.getElementById('bgColor').value,
-          enableGlow: document.getElementById('enableGlow').checked,
-          glowIntensity: parseFloat(document.getElementById('glowIntensity').value)
+          glowRange: parseInt(document.getElementById('glowRange').value),
+          outlineWidth: parseInt(document.getElementById('outlineWidth').value),
+          outlineColor: document.getElementById('outlineColor').value
         },
         font: {
           size: document.getElementById('fontSize').value,
@@ -767,12 +776,6 @@
       document.getElementById('params' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
     }
 
-    // 更新发光颜色显示（根据开关）
-    function updateGlowColor() {
-      const wrapper = document.getElementById('glowColorWrapper');
-      wrapper.classList.toggle('hidden', !document.getElementById('enableGlow').checked);
-    }
-
     // 显示状态
     function showStatus(msg, isError = false) {
       const el = document.getElementById('status');
@@ -796,12 +799,9 @@
     document.getElementById('fontFamilyCJK').addEventListener('change', updateFontPreview);
     document.getElementById('textColor').addEventListener('input', updateFontPreview);
     document.getElementById('textOpacity').addEventListener('input', updateFontPreview);
-    document.getElementById('glowColor').addEventListener('input', updateFontPreview);
-    document.getElementById('glowIntensity').addEventListener('input', updateFontPreview);
-    document.getElementById('enableGlow').addEventListener('change', () => {
-      updateGlowColor();
-      updateFontPreview();
-    });
+    document.getElementById('glowRange').addEventListener('input', updateFontPreview);
+    document.getElementById('outlineWidth').addEventListener('input', updateFontPreview);
+    document.getElementById('outlineColor').addEventListener('input', updateFontPreview);
 
     document.getElementById('saveBtn').addEventListener('click', async () => {
       const newConfig = collectForm();
