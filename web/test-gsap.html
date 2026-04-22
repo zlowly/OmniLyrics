@@ -27,6 +27,7 @@
 
         #test-line {
             font-size: 32px;
+            font-weight: 900;
             letter-spacing: 8px;
         }
 
@@ -38,6 +39,7 @@
             background-clip: text;
             -webkit-background-clip: text;
             color: transparent;
+            text-shadow: none;  /* 初始无发光 */
         }
 
         button {
@@ -67,20 +69,51 @@
         const playBtn = document.getElementById('playBtn');
 
         playBtn.addEventListener('click', () => {
-            const charDuration = 2; // 每个字变亮的过程时长，这里假设每个字都是2秒过程
+            const tl = gsap.timeline({ paused: true });
 
-            // 3. 计算最终 Stagger，使得视觉上平滑
-            const stagger = charDuration * 0.8;
+            // 每个字的开始时间（毫秒）和持续时间
+            const words = [
+                { start: 0, duration: 500 },
+                { start: 500, duration: 700 },
+                { start: 1200, duration: 600 },
+                { start: 1800, duration: 700 },
+                { start: 2500, duration: 500 },
+                { start: 3000, duration: 700 },
+                { start: 3700, duration: 600 },
+                { start: 4300, duration: 700 },
+                { start: 5000, duration: 500 },
+                { start: 5500, duration: 500 }
+            ];
 
-            gsap.to(chars, {
-                backgroundPositionX: '0%',
-                duration: charDuration,
-                stagger: stagger,
-                ease: 'none',
-                overwrite: 'auto'
+            chars.forEach((char, i) => {
+                char.style.backgroundPositionX = '100%';
             });
-        });
 
+            words.forEach((word, i) => {
+                const char = chars[i];
+                const startTime = word.start / 1000;
+                const duration = word.duration / 1000;
+
+                // 使用 absolute time position
+                tl.to(char, {
+                    backgroundPositionX: '0%',
+                    duration: duration,
+                    ease: 'none'
+                }, startTime);
+                tl.to(char, {
+                    textShadow: '0 0 30px rgba(255,255,0,1)',
+                    duration: duration,
+                    ease: 'none'
+                }, startTime);
+                tl.to(char, {
+                    textShadow: '0 0 0px rgba(255,255,0,0)',
+                    duration: 1,
+                    ease: 'none'
+                }, startTime + duration);
+            });
+
+            tl.play();
+        });
     </script>
 </body>
 
