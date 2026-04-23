@@ -105,7 +105,7 @@ class KaraokeRenderer extends LyricsRendererBase {
                 -webkit-background-clip: text;
                 background-clip: text;
                 color: transparent;
-                text-shadow: none;
+                filter: drop-shadow(0 0 0px rgba(${highlight.r}, ${highlight.g}, ${highlight.b}, 0));
             }
         `;
     }
@@ -180,33 +180,46 @@ class KaraokeRenderer extends LyricsRendererBase {
     createWordTimeline(words, lineStartTime) {
         const tl = gsap.timeline({ paused: true });
 
-        const textColorStr = `rgba(${this.textColor.r}, ${this.textColor.g}, ${this.textColor.b}, ${this.textColor.a})`;
+        const textR = this.textColor.r;
+        const textG = this.textColor.g;
+        const textB = this.textColor.b;
+        const maxGlow = this.glowRange;
+
+        let cumStart = 0;
 
         words.forEach((word, i) => {
             const el = this.wordElements[i];
-            // 设置正确的初始背景位置
             el.style.backgroundPositionX = '100%';
-
-            // 应用静态发光和轮廓
-            let styles = [];
-            if (this.glowRange > 0) {
-                styles.push(`0 0 ${this.glowRange}px ${textColorStr}`);
-            }
-            el.style.textShadow = styles.length > 0 ? styles.join(', ') : 'none';
-            if (this.outlineWidth > 0) {
-                el.style.webkitTextStroke = `${this.outlineWidth}px ${this.outlineColor}`;
-            }
+            el.style.filter = `drop-shadow(0 0 0px rgba(${textR},${textG},${textB},0))`;
 
             const duration = i === 0
                 ? (words[0].time - lineStartTime) / 1000
                 : (words[i].time - words[i - 1].time) / 1000;
             const adjustedDuration = Math.max(duration, 0.1);
-            // 只做变亮动画
+            const startTime = cumStart;
+
+            // 渐变变亮动画
             tl.to(el, {
                 backgroundPositionX: '0%',
                 duration: adjustedDuration,
                 ease: 'none'
-            });
+            }, startTime);
+
+            // 发光淡入 (0px → maxGlow)
+            tl.to(el, {
+                filter: `drop-shadow(0 0 ${maxGlow}px rgba(${textR},${textG},${textB},1))`,
+                duration: adjustedDuration,
+                ease: 'none'
+            }, startTime);
+
+            // 发光淡出 (maxGlow → 0px，持续1秒)
+            tl.to(el, {
+                filter: `drop-shadow(0 0 ${maxGlow}px rgba(${textR},${textG},${textB},0))`,
+                duration: 1,
+                ease: 'none'
+            }, startTime + adjustedDuration);
+
+            cumStart += adjustedDuration;
         });
 
         this.wordTimeline = tl;
@@ -233,12 +246,15 @@ class KaraokeRenderer extends LyricsRendererBase {
         this.wordElements = [];
 
         // 创建每个字的元素
+        const textR = this.textColor.r;
+        const textG = this.textColor.g;
+        const textB = this.textColor.b;
         words.forEach((word, i) => {
             const span = document.createElement('span');
             span.className = 'karaoke-word';
             span.textContent = word.text;
-            // 初始为暗色
             span.style.backgroundPositionX = '100%';
+            span.style.filter = `drop-shadow(0 0 0px rgba(${textR},${textG},${textB},0))`;
             this.container.appendChild(span);
             this.wordElements.push(span);
         });

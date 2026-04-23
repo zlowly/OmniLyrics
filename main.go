@@ -61,6 +61,7 @@ func main() {
 	// 注册各路由处理器，路径映射到对应的处理函数
 	http.HandleFunc("/health", corsHandler(handleHealth))
 	http.HandleFunc("/status", corsHandler(makeStatusHandler(smtc)))
+	http.HandleFunc("/hold", corsHandler(handleHold))
 	http.HandleFunc("/check_cache", corsHandler(handleCheckCacheWrapper(cacheDir)))
 	http.HandleFunc("/update_cache", corsHandler(handleUpdateCacheWrapper(cacheDir)))
 	http.HandleFunc("/smtc", corsHandler(makeSMTCHandler(smtc)))

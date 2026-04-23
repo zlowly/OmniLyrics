@@ -14,6 +14,12 @@ import (
 	"github.com/omnilyrics/bridge/smtc"
 )
 
+// holdFrozen 标记是否冻结状态（暂停获取新数据）
+var holdFrozen bool
+
+// lastStatus 缓存最后一次获取的状态数据
+var lastStatus map[string]interface{}
+
 // handleHealth 处理健康检查请求的 HTTP 端点。
 // 该端点用于服务监控和负载均衡探测，始终返回 OK 状态。
 // @param w HTTP 响应写入器
@@ -43,33 +49,59 @@ func makeStatusHandler(s smtc.SMTC) http.HandlerFunc {
 
 // handleStatus 处理获取媒体状态请求的 HTTP 端点。
 // 该端点返回简化版的媒体信息（title、artist、status、position、duration）。
+// 当 holdFrozen 为 true 时，返回缓存的最后一帧数据。
 // @param w HTTP 响应写入器
 // @param r HTTP 请求对象
 // @param s SMTC 接口实例
-func handleStatus(w http.ResponseWriter, _ *http.Request, s smtc.SMTC) {
+func handleStatus(w http.ResponseWriter, r *http.Request, s smtc.SMTC) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// 冻结状态：返回缓存数据
+	if holdFrozen && lastStatus != nil {
+		json.NewEncoder(w).Encode(lastStatus)
+		return
+	}
 
 	// 获取媒体数据，如果发生错误返回默认空值
 	data, err := s.GetData()
 	if err != nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		result := map[string]interface{}{
 			"title":    "",
 			"artist":   "",
 			"status":   "Error",
 			"position": 0,
 			"duration": 0,
-		})
+		}
+		lastStatus = result
+		json.NewEncoder(w).Encode(result)
 		return
 	}
 
 	// 返回媒体的简化信息
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	result := map[string]interface{}{
 		"title":    data.Title,
 		"artist":   data.Artist,
 		"status":   data.Status,
 		"position": data.PositionMs,
 		"duration": data.DurationMs,
+	}
+	lastStatus = result
+json.NewEncoder(w).Encode(result)
+}
+
+// handleHold 处理暂停/恢复状态更新的 HTTP 端点。
+// 切换 holdFrozen 状态，实现冻结或恢复 status 接口的数据返回。
+// @param w HTTP 响应写入器
+// @param r HTTP 请求对象
+func handleHold(w http.ResponseWriter, r *http.Request) {
+	holdFrozen = !holdFrozen
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"hold": holdFrozen,
 	})
 }
 
