@@ -31,7 +31,7 @@ class KaraokeRenderer extends LyricsRendererBase {
         // 发光与轮廓配置
         this.glowRange = colors.glowRange ?? 1;
         this.outlineWidth = colors.outlineWidth ?? 1;
-        this.outlineColor = colors.outlineColor || '#ffffff';
+        this.outlineColor = this.parseColor(colors.outlineColor || '#ffffff');
 
         // 解析文字颜色
         this.textColor = this.parseColor(colors.text || '#ffffff');
@@ -96,6 +96,9 @@ class KaraokeRenderer extends LyricsRendererBase {
         }
 
         // 使用内联样式确保不被 CSS 覆盖
+        const dimOutline = this.adjustBrightness(this.outlineColor, 0.6);
+        const outlineRgba = `rgba(${dimOutline.r}, ${dimOutline.g}, ${dimOutline.b}, ${dimOutline.a})`;
+
         styleEl.textContent = `
             .karaoke-word {
                 display: inline-block;
@@ -106,6 +109,8 @@ class KaraokeRenderer extends LyricsRendererBase {
                 background-clip: text;
                 color: transparent;
                 filter: drop-shadow(0 0 0px rgba(${highlight.r}, ${highlight.g}, ${highlight.b}, 0));
+                -webkit-text-stroke: ${this.outlineWidth}px ${outlineRgba};
+                text-stroke: ${this.outlineWidth}px ${outlineRgba};
             }
         `;
     }
