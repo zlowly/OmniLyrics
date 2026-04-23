@@ -1,11 +1,11 @@
 # OmniLyrics
 
-桌面歌词引擎 (Desktop Lyrics Engine) - 为 OBS 直播场景优化的桌面歌词显示工具。
+桌面歌词引擎 - 为 OBS 直播场景优化的桌面歌词显示工具。
 
 ## 功能特性
 
 - **系统媒体同步**：自动监听 Windows 系统媒体播放状态，实时同步歌曲播放进度
-- **多源歌词获取**：优先使用本地缓存歌词，无缓存时自动从网络 (lrclib.net) 搜索匹配
+- **多源歌词搜索**：支持 lrclib、QQ 音乐，按优先级搜索，优先使用逐字时间戳
 - **多种展示模式**：
   - 单行卡拉OK - 逐字高亮发光效果
   - 双行滚动 - 当前行在上、下一行在下的交替滚动
@@ -13,17 +13,11 @@
 - **OBS 优化**：透明背景、支持多层叠加
 - **可配置**：支持自定义颜色、字体、动画参数
 
-## 环境要求
-
-- Windows 10/11
-- golang
-- 支持系统媒体传输控制 (SMTC) 的播放器（如 Spotify, Apple Music, QQ音乐等）
-
 ## 快速开始
 
 ### 1. 运行
 
-```
+```powershell
 .\bridge.exe
 ```
 
@@ -36,8 +30,7 @@
 1. 添加浏览器源
 2. URL 设置为 `http://localhost:8080/`
 3. 宽度：1920，高度：1080（根据需要调整）
-4. 勾选"控制 audio"选项（根据需要）
-5. 自定义 CSS 中设置透明：
+4. 自定义 CSS 中设置透明：
 
 ```css
 body {
@@ -49,71 +42,8 @@ body {
 
 访问设置页面：http://localhost:8080/settings.html
 
-### 通用设置
-
-- 字体颜色
-- 字体大小
-- 字体
-- 背景色
-- 背景透明
-
-### 模式参数
-
-根据选择的展示模式，显示对应的参数配置。
-
-## 文件结构
-
-```
-OmniLyrics/
-├── bridge.exe          # Go 后端服务 (可执行文件)
-├── Bridge.ps1         # PowerShell 后端 (旧版本保留)
-├── main.go           # Go 后端源码
-├── handlers.go       # HTTP 处理器
-├── go.mod           # Go 模块定义
-├── smtc/           # SMTC 实现
-│   ├── smtc.go         # 接口定义
-│   ├── smtc_winrt.go   # Windows WinRT 实现
-│   └── smtc_mock.go    # 跨平台 Mock
-├── web/             # 前端资源
-│   ├── index.html
-│   ├── settings.html
-│   └── scripts/
-├── Cache/            # 歌词缓存
-└── Config/          # 配置存储
-```
-
-## API 接口
-
-### 后端接口
-
-| 接口 | 方法 | 描述 |
-|------|------|------|
-| `/health` | GET | 健康检查 |
-| `/status` | GET | 获取播放状态 (简单) |
-| `/smtc` | GET | 获取播放状态 (完整，含专辑) |
-| `/check_cache` | GET | 查询歌词缓存 |
-| `/update_cache` | POST | 更新歌词缓存 |
-| `/config` | GET/POST | 配置管理 |
-| `/shutdown` | GET/POST | 关闭服务 |
-
-### 数据格式
-
-**/status 返回**：
-```json
-{
-    "title": "歌曲名",
-    "artist": "艺术家",
-    "status": "Playing|Stopped",
-    "position": 51260,
-    "duration": 211000
-}
-```
-
-## 技术栈
-
-- 前端：原生 JavaScript + GSAP 动画
-- 后端：Go + winrt-go (Windows SMTC)
-- 架构：心跳轮询 + 多源竞态调度
+- **歌词源设置**：配置搜索源优先级、超时、适用App
+- **展示设置**：选择模式、颜色、字体、动画参数
 
 ## 常见问题
 
@@ -132,18 +62,23 @@ A: 在浏览器源的自定义 CSS 中添加：
 body { background: transparent !important; }
 #app { background: transparent !important; }
 ```
+### Q: 只有QQ播放器等少数播放器能滚动歌词
+A: 目前仅技术上通过Windows的SMTC获取播放器的播放进度，而酷狗音乐没有提供播放进度，网易云不支持SMTC（可通过安装BetterNCM支持）
 
 ## 开发
 
-### 调试
-
-1. 启动后端：`.\bridge.exe` 或 `go run main.go`
-2. 打开浏览器开发者工具
-3. 查看 Console 输出
+### 启动
+```powershell
+.\bridge.exe
+```
+或
+```powershell
+go run main.go
+```
 
 ### 构建
 
-```bash
+```powershell
 go build -o bridge.exe
 ```
 
@@ -155,9 +90,6 @@ go build -o bridge.exe
 
 GPL License
 
+### 鸣谢
 
-### 鸣谢与第三方库声明
-
-本项目使用了以下第三方开源库：
-
-GSAP - 由 GreenSock 开发。自 2025 年 5 月起，GSAP 已由 Webflow 赞助并全面开放免费使用（包含所有高级插件），允许个人及商业用途。本项目在遵循其原始版权声明的前提下将其包含在内。
+- GSAP - 由 GreenSock 开发。自 2025 年 5 月起，GSAP 已由 Webflow 赞助并全面开放免费使用。

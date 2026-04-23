@@ -12,9 +12,14 @@ OmniLyrics
 通过监听系统媒体播放状态，自动获取并显示匹配的歌词，支持多种展示模式，专为 OBS 直播场景优化。
 
 ### 1.4 技术栈
-- 前端：HTML/CSS/JavaScript (原生)
-- 后端：PowerShell + .NET (Windows 系统媒体传输控制)
-- 动画：GSAP
+
+| 层级 | 技术 |
+|------|------|
+| 前端 | 原生 JavaScript + HTML/CSS |
+| 动画 | GSAP (由 Webflow 赞助，全面免费) |
+| 后端 | Go (golang) |
+| Windows API | winrt-go (SMTC 系统媒体传输控制) |
+| 数据格式 | JSON |
 
 ---
 
@@ -26,27 +31,33 @@ OmniLyrics
 ┌─────────────────────────────────────────────────────────────┐
 │                      前端 (Browser)                        │
 │  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐   │
-│  │  index.html │→│ motion.js   │→│ renderers/*     │   │
-│  │  settings  │  │ (业务逻辑)   │  │ (渲染器模块)    │   │
+│  │ index.html │  │ motion.js   │  │ renderers/*     │   │
+│  │ settings  │  │ (调度引擎) │  │ (渲染器模块)    │   │
 │  └─────────────┘  └──────────────┘  └──────────────────┘   │
+│        ↓                ↓                                   │
+│  ┌──────────────────────────────────────────────┐      │
+│  │ lyrics/scheduler.js - 歌词源调度器           │      │
+│  │ lyrics/providers/ - 歌词源模块            │      │
+│  └──────────────────────────────────────────────┘      │
 │                            ↓                           │
-│                     ┌────────────────┐                    │
-│                     │ config.js     │                    │
-│                     │ (配置管理)    │                    │
-└─────────────────────┴──────────────┴─────────────────────┘
-                             │
-                     HTTP:8080/config
-                             │
-┌─────────────────────────────┴──────────────────────────────┐
-│                   后端 (Bridge.ps1)                      │
-│  ┌──────────────┐  ┌────────────┐  ┌───────────────┐  │
-│  │ /status    │  │ /check_   │  │ /config     │  │
-│  │           │  │ cache    │  │ (新增)     │  │
-│  └──────────────┘  └────────────┘  └───────────────┘  │
-│         ↑              ↑               ↑              │
-│  ┌─────┴──────────────┴────────────┴──────────────┐ │
-│  │ WinRT: SMTC (系统媒体传输控制)                 │ │
-│  └──────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────┐           │
+│  │ config.js - 配置管理                      │           │
+│  └─────────────────────────────────────────┘           │
+└───────────────────────────────────────────────────────────────┘
+                              │
+                    HTTP:8080/* API
+                              │
+┌───────────────────────────────┴───────────────────────────┐
+│                     后端 (Go)                        │
+│  ┌──────────────┐  ┌────────────┐  ┌───────────────┐ │
+│  │ /status    │  │ /decrypt  │  │ /config/*   │ │
+│  │ /smtc     │  │ (QRC解密) │  │            │ │
+│  └──────────────┘  └────────────┘  └───────────────┘ │
+│         ↑              ↑                               │
+│  ┌─────┴─────────────────────────────────┐         │
+│  │ WinRT: SMTC (系统媒体传输控制)        │         │
+│  │ Mock: 模拟实现 (非Windows)          │         │
+│  └───────────────────────────────��───────────┘         │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -54,215 +65,198 @@ OmniLyrics
 
 | 模块 | 职责 |
 |------|------|
-| motion.js | 心跳监测、多源竞态调度、帧数据计算 |
-| config.js | 配置读取/保存（调用 /config 接口） |
-| renderers/base.js | 渲染器基类定义 |
-| renderers/karaoke.js | 单行卡拉OK渲染器 |
-| renderers/scroll.js | 双行滚动渲染器 |
-| renderers/blur.js | 多行渐变模糊渲染器 |
-| renderers/index.js | 渲染器管理器（入口） |
-| Bridge.ps1 | HTTP 服务器 + WinRT SMTC 监听 |
+| motion.js | 心跳监测、帧数据计算 |
+| config.js | 配置读取/保存 |
+| renderers/base.js | 渲染器基类 |
+| renderers/karaoke.js | 单行卡拉OK |
+| renderers/scroll.js | 双行滚动 |
+| renderers/blur.js | 多行渐变模糊 |
+| lyrics/index.js | 歌词调度器（优先级/并行搜索） |
+| lyrics/providers/*.js | 歌词源实现 |
+| main.go | Go 后端入口 |
+| handlers.go | HTTP 接口处理 |
+| smtc/*.go | SMTC 实现 |
 
 ---
 
-## 3. 功能规格
+## 3. API 接口
 
-### 3.1 心跳与状态同步
+### 3.1 HTTP 接口
 
-| 接口 | 方法 | 描述 |
+| 端点 | 方法 | 描述 |
 |------|------|------|
-| `/status` | GET | 返回 { title, artist, position, duration } |
+| `/health` | GET | 健康检查 |
+| `/status` | GET | 简化播放状态 (title, artist, status, position, duration) |
+| `/smtc` | GET | 完整播放状态 (含 albumTitle, appName, positionMs, durationMs) |
+| `/smtc` | GET | 播放状态 (完整 SMTCData) |
+| `/check_cache` | GET | 查询歌词缓存 (title, artist) |
+| `/update_cache` | POST | 更新歌词缓存 (JSON Body) |
+| `/config` | GET/POST | 渲染器配置 |
+| `/config/lyrics` | GET/POST | 歌词源配置 |
+| `/decrypt` | POST | QRC 歌词解密 |
+| `/fonts` | GET | 系统字体列表 |
+| `/shutdown` | GET/POST | 关闭服务 |
 
-- 心跳间隔：200ms
-- position 单位：毫秒
-- 自动计算当前播放进度（支持暂停恢复后的时间同步）
+### 3.2 数据格式
 
-### 3.2 歌词获取流程
-
-```
-1. motion.js 获取 /status
-2. 检测歌曲变化 → 检查本地缓存 (/check_cache)
-3. 无本地缓存 → 请求在线歌词 (lrclib.net)
-4. 解析 LRC → 存储本地缓存 (/update_cache)
-5. 计算帧数据 → 传递给渲染器
-```
-
-### 3.3 歌词源
-
-| 源 | 优先级 | 描述 |
-|------|--------|------|
-| 本地缓存 | 1 | Cache/*.lrc |
-| lrclib.net | 2 | 在线搜索匹配 |
-
----
-
-## 4. 展示模式规格
-
-### 4.1 渲染器基类接口
-
-```javascript
-class LyricsRendererBase {
-    constructor(container, stage, config) { }
-    render(frameData) { }
-    getDefaultConfig() { return {}; }
-    applyConfig(config) { }
-    destroy() { }
+**/status 返回**：
+```json
+{
+  "title": "歌曲名",
+  "artist": "艺术家",
+  "status": "Playing",
+  "position": 51260,
+  "duration": 211000
 }
 ```
 
-### 4.2 模式 1: 单行卡拉OK (karaoke)
+**/smtc 返回**：
+```json
+{
+  "status": "Playing",
+  "title": "歌曲名",
+  "artist": "艺术家",
+  "albumTitle": "专辑名",
+  "positionMs": 51260,
+  "durationMs": 211000,
+  "hasSession": true,
+  "appName": "QQMusic.exe"
+}
+```
 
-**描述**：当前行逐字高亮发光
+**/config/lyrics 返回**：
+```json
+{
+  "timeout": 5000,
+  "retry": 1,
+  "sources": [
+    { "name": "lrclib", "enabled": true, "priority": 1, "apps": ["*"] },
+    { "name": "qqmusic", "enabled": true, "priority": 2, "apps": ["QQMusic.exe", "*"] }
+  ]
+}
+```
 
-**效果**：
-- 当前行整行显示
-- 逐字高亮（已唱字发光，未唱字普通）
-- 当前字有缩放动画
+**/decrypt 请求**：
+```json
+{"encrypted": "4A5B6C..."}
+```
+
+**/decrypt 返回**：
+```json
+{"lyrics": "[00:00.00]原词", "error": ""}
+```
+
+---
+
+## 4. 歌词源调度
+
+### 4.1 搜索流程
+
+```
+1. 获取当前播放信息 (/status)
+2. 检测歌曲变化 → 检查本地缓存 (/check_cache)
+3. 无本地缓存 → 歌词调度器搜索
+4. 按优先级顺序搜索，相同优先级并行
+5. 优先返回有逐字时间戳的结果
+6. 结果写入本地缓存 (/update_cache)
+```
+
+### 4.2 调度配置
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| timeout | number | 单源超时(毫秒) |
+| retry | number | 失败重试次数 |
+| sources | array | 歌词源列表 |
+
+### 4.3 源配置
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| name | string | 源名称 (lrclib, qqmusic) |
+| enabled | boolean | 是否启用 |
+| priority | number | 优先级 (数字越小越高) |
+| apps | array | 适用App列表，* 表示全部 |
+
+---
+
+## 5. 展示模式规格
+
+### 5.1 单行卡拉OK (karaoke)
+
+逐字高亮发光效果，当前字有缩放动画。
 
 **参数**：
-
 | 参数 | 默认值 | 描述 |
 |------|--------|------|
-| wordGlow | true | 逐字发光开关 |
-| glowColor | #00ffff | 发光颜色 |
+| wordAnimation | true | 逐字动画开关 |
 | animationDuration | 0.3 | 动画时长(秒) |
 | currentScale | 1.05 | 当前字缩放比例 |
 
-### 4.3 模式 2: 双行滚动 (scroll)
+### 5.2 双行滚动 (scroll)
 
-**描述**：当前行在上、下一行在下交替滚动
-
-**效果**：
-```
-┌─────────────────────────┐
-│ 第 1 行: I was a liar │  ← 当前行（上）
-│ 第 2 行: I gave in... │  ← 下一行（下）
-└─────────────────────────┘
-```
-
-- 当前行在上，固定显示
-- 下一行在下方渐显
-- 切换时有滚动动画
+当前行在上、下一行在下交替滚动。
 
 **参数**：
-
 | 参数 | 默认值 | 描述 |
 |------|--------|------|
 | showNext | true | 显示下一行 |
 | nextOpacity | 0.6 | 下一行透明度 |
 | scrollDuration | 0.4 | 滚动时长(秒) |
 
-### 4.4 模式 3: 多行渐变模糊 (blur)
+### 5.3 多行渐变模糊 (blur)
 
-**描述**：一屏多行，亮度递减，模糊递增，尺寸递减
-
-**效果**（9行示例）：
-```
-┌─────────────────────────┐
-│  第 1 行: I was a...  │  亮度100%  模糊0   大小100%
-│  第 2 行: I know...   │  亮度85%  模糊1px 大小90%
-│  第 3 行: Feel like.. │  亮度70%  模糊2px 大小80%
-│  第 4 行: I should've │  亮度55%  模糊3px 大小70%
-│  第 5 行: And I know │  亮度40%  模糊4px 大小60%
-│  第 6 行: But boy... │  亮度25%  模糊5px 大小50%
-│  ...                 │  ...
-└─────────────────────────┘
-```
+一屏多行，亮度/模糊/尺寸递减。
 
 **参数**：
-
 | 参数 | 默认值 | 描述 |
 |------|--------|------|
-| visibleLines | 9 | 一屏显示行数 |
-| opacityDecay | 0.15 | 每行亮度递减 |
-| blurIncrement | 0.5 | 每行模糊递增(px) |
-| scaleDecay | 0.1 | 每行缩小比例 |
-| blurMax | 6 | 最大模糊值(px) |
+| visibleLines | 9 | 显示行数 |
+| lineSpacing | 1.5 | 行距 |
+| opacityDecay | 0.15 | 亮度衰减 |
+| blurIncrement | 0.5 | 模糊递增 |
+| scaleDecay | 0.1 | 缩小比例 |
+| blurMax | 6 | 最大模糊值 |
 
 ---
 
-## 5. 配置规格
+## 6. 配置规格
 
-### 5.1 配置数据结构
+### 6.1 渲染器配置
 
 ```json
 {
-    "mode": "karaoke",
-    "colors": {
-        "text": "#ffffff",
-        "glow": "#00ffff",
-        "bg": "#000000"
-    },
-    "font": {
-        "size": "2.4rem",
-        "family": "system-ui, -apple-system, Arial"
-    },
-    "bg": {
-        "color": "#000000",
-        "transparent": true
-    },
-    "modeParams": {
-        "karaoke": {
-            "wordGlow": true,
-            "glowColor": "#00ffff",
-            "animationDuration": 0.3,
-            "currentScale": 1.05
-        },
-        "scroll": {
-            "showNext": true,
-            "nextOpacity": 0.6,
-            "scrollDuration": 0.4
-        },
-        "blur": {
-            "visibleLines": 9,
-            "opacityDecay": 0.15,
-            "blurIncrement": 0.5,
-            "scaleDecay": 0.1,
-            "blurMax": 6
-        }
-    }
+  "mode": "karaoke",
+  "colors": {
+    "text": "#ffffff",
+    "bg": "#000000",
+    "glowRange": 1,
+    "outlineWidth": 1,
+    "outlineColor": "#ffffff"
+  },
+  "font": {
+    "size": "2.4rem",
+    "family": "Arial, Microsoft YaHei"
+  },
+  "modeParams": {
+    "karaoke": { "wordAnimation": true, "animationDuration": 0.3, "currentScale": 1.05 },
+    "scroll": { "showNext": true, "nextOpacity": 0.6, "scrollDuration": 0.4 },
+    "blur": { "visibleLines": 9, "lineSpacing": 1.5, "opacityDecay": 0.15, "blurIncrement": 0.5, "scaleDecay": 0.1, "blurMax": 6 }
+  }
 }
 ```
 
-### 5.2 后端接口
+### 6.2 歌词源配置
 
-| 接口 | 方法 | 描述 |
-|------|------|------|
-| `/config` | GET | 读取配置 |
-| `/config` | POST | 保存配置 (JSON Body) |
-
-### 5.3 默认配置
-
-配置首次加载时使用默认值，后续保存后从 `Config/renderer.json` 读取。
-
----
-
-## 6. 页面规格
-
-### 6.1 index.html (主页面)
-
-- 歌词显示区域：`#lyricsStage > #lyrics`
-- 设置按钮：右下角悬浮按钮，点击打开设置页面
-
-### 6.2 settings.html (设置页面)
-
-```
-┌─────────────────────────────────────────────┐
-│  OmniLyrics 设置                      [X]   │
-├─────────────────────────────────────────────┤
-│  展示模式：[▼ 单行卡拉OK ]                   │
-│                                             │
-│  ── 通用设置 ──                              │
-│  字体颜色：[#ffffff     ]  字体大小：[2.4rem ] │
-│  字体  ：[system-ui  ]                      │
-│  背景色 ：[#000000    ]  [✓] 透明           │
-│                                             │
-│  ── 模式参数 ──                             │
-│  [✓] 逐字发光  发光颜色：[#00ffff]           │
-│  动画时长：[0.3  ]  当前字缩放：[1.05]       │
-│                                             │
-│  [ 保存 ]  [ 恢复默认 ]  [ 实时预览 ]        │
-└─────────────────────────────────────────────┘
+```json
+{
+  "timeout": 5000,
+  "retry": 1,
+  "sources": [
+    { "name": "lrclib", "enabled": true, "priority": 1, "apps": ["*"] },
+    { "name": "qqmusic", "enabled": true, "priority": 2, "apps": ["QQMusic.exe", "*"] }
+  ]
+}
 ```
 
 ---
@@ -271,28 +265,53 @@ class LyricsRendererBase {
 
 ```
 OmniLyrics/
-├── index.html              # 主页面
-├── settings.html        # 设置页面
-├── Bridge.ps1           # 后端服务
-├── Run.bat              # 启动脚本
-├── docs/
-│   ├── SPEC.md         # 本文档
-│   └── README.md      # 项目说明
-├── scripts/
-│   ├── motion.js     # 业务逻辑
-│   ├── config.js   # 配置管理
-│   └── renderers/
-│       ├── index.js     # 渲染器管理器
-│       ├── base.js     # 基类
-│       ├── karaoke.js  # 单行卡拉OK
-│       ├── scroll.js  # 双行滚动
-│       └── blur.js   # 多行模糊
-├── libs/
-│   └── gsap.min.js
-├── Cache/              # 歌词缓存
-│   └── *.lrc
-└── Config/            # 配置存储
-    └── renderer.json
+├── main.go                    # Go 后端入口
+├── handlers.go               # HTTP 处理器
+├── config.go               # 配置系统
+├── decrypter.go            # QRC 解密
+├── handler.go             # /decrypt 接口
+├── smtc/
+│   ├── smtc.go           # 接口定义
+│   ├── smtc_winrt.go     # Windows 实现
+│   └── smtc_mock.go     # Mock 实现
+├── smtc_factories*.go    # 工厂函数
+├── fonts/
+│   ├── fonts.go          # 接口
+│   ├── fonts_windows.go # Windows 实现
+│   └── fonts_linux.go  # Linux 实现
+├── go.mod              # Go 模块
+├── go.sum
+├── Makefile            # 构建脚本
+├── README.md          # 项目说明
+├── bridge.exe         # 编译后的可执行文件
+│
+├── Config/                 # 配置目录
+│   ├── renderer.json       # 渲染器配置
+│   └── lyrics.json        # 歌词源配置
+│
+├── Cache/                  # 歌词缓存目录
+│   └── *.lrc           # 歌词文件
+│
+├── web/                   # 前端资源
+│   ├── index.html        # 主页面
+│   ├── settings.html   # 设置页面
+│   └── scripts/
+│       ├── config.js     # 配置管理
+│       ├── motion.js    # 调度引擎
+│       ├── renderers/
+│       │   ├── index.js
+│       │   ├── base.js
+│       │   ├── karaoke.js
+│       │   ├── scroll.js
+│       │   └── blur.js
+│       └── lyrics/
+│           ├── index.js      # 调度器
+│           └── providers/
+│               ├── base.js
+│               └── qqmusic.js
+│
+└── docs/
+    └── SPEC.md          # 本文档
 ```
 
 ---
@@ -300,21 +319,20 @@ OmniLyrics/
 ## 8. 验收标准
 
 ### 8.1 功能验收
+- [x] 心跳正常获取播放状态 (/status)
+- [x] 换歌时自动获取歌词
+- [x] 本地缓存优先，无缓存时请求在线歌词
+- [x] 三种展示模式可正常切换
+- [x] 配置可保存和读取
+- [x] 多歌词源按优先级搜索
+- [x] QQ音乐歌词解密
 
-- [ ] 心跳正常获取播放状态 (/status)
-- [ ] 换歌时自动获取歌词
-- [ ] 本地缓存优先，无缓存时请求在线歌词
-- [ ] 三种展示模式可正常切换
-- [ ] 配置可保存和读取
-
-### 8.2 视觉验收
-
-- [ ] 单行卡拉OK：逐字高亮效果流畅
-- [ ] 双行滚动：上下行交替滚动无跳跃
-- [ ] 多行模糊：亮度/模糊/尺寸渐变平滑
+### 8.2 视��验��
+- [x] 单行卡拉OK：逐字高亮效果流畅
+- [x] 双行滚动：上下行交替滚动无跳跃
+- [x] 多行模糊：亮度/模糊/尺寸渐变平滑
 
 ### 8.3 性能验收
-
-- [ ] 帧率稳定 60fps
-- [ ] 内存无泄漏
-- [ ] 切换歌曲无卡顿
+- [x] 帧率稳定 60fps
+- [x] 内存无泄漏
+- [x] 切换歌曲无卡顿
