@@ -17,6 +17,8 @@ type SMTCData struct {
 	DurationMs int64 `json:"durationMs,omitempty"`
 	// HasSession 表示是否存在活动的媒体会话
 	HasSession bool `json:"hasSession"`
+	// AppName 表示当前媒体源应用的名称（App User Model ID）
+	AppName string `json:"appName,omitempty"`
 }
 
 // SMTC 是获取系统媒体传输控制数据的接口。

@@ -88,12 +88,13 @@ func (w *WinRT) GetData() (SMTCData, error) {
 		}
 	}
 
-	// 如果标题为空，使用源应用程序名称作为备选
-	// 这确保始终有可显示的内容
+	if appName, err := session.GetSourceAppUserModelId(); err == nil && appName != "" {
+		data.AppName = appName
+	}
+
+	// 如果标题为空，使用默认占位符
 	if data.Title == "" {
-		if srcApp, err := session.GetSourceAppUserModelId(); err == nil && srcApp != "" {
-			data.Title = srcApp
-		}
+		data.Title = "Unknown"
 	}
 
 	// 获取时间线属性，包括播放位置和总时长

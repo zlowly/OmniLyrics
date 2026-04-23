@@ -383,6 +383,74 @@ func handleConfig(w http.ResponseWriter, r *http.Request, configDir string) {
 	}
 }
 
+// handleLyricsConfigWrapper 创建处理歌词配置请求的 HTTP 处理器。
+// 闭包捕获 configDir 参数以确定配置目录位置。
+// @param configDir 配置目录路径
+// @return http.HandlerFunc 返回配置好的 HTTP 处理函数
+func handleLyricsConfigWrapper(configDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		handleLyricsConfig(w, r, configDir)
+	}
+}
+
+// handleLyricsConfig 处理歌词配置请求的 HTTP 端点。
+// GET 请求返回当前配置（文件中的自定义配置或默认配置）。
+// POST 请求保存自定义配置到 lyrics.json 文件。
+// @param w HTTP 响应写入器
+// @param r HTTP 请求对象
+// @param configDir 配置目录路径
+func handleLyricsConfig(w http.ResponseWriter, r *http.Request, configDir string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	configPath := filepath.Join(configDir, "lyrics.json")
+
+	// GET 请求：读取配置
+	if r.Method == "GET" {
+		// 尝试读取已保存的配置文件
+		if _, err := os.Stat(configPath); err == nil {
+			content, err := os.ReadFile(configPath)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+				return
+			}
+			w.Write(content)
+		} else {
+			// 文件不存在，返回默认配置
+			defaultConfig := map[string]interface{}{
+				"timeout": 5000,
+				"retry":   1,
+				"sources": []map[string]interface{}{
+					{"name": "lrclib", "enabled": true, "priority": 1, "apps": []string{"*"}},
+					{"name": "qqmusic", "enabled": true, "priority": 2, "apps": []string{"QQMusic.exe", "*"}},
+				},
+			}
+			json.NewEncoder(w).Encode(defaultConfig)
+		}
+		return
+	}
+
+	// POST 请求：保存配置
+	if r.Method == "POST" {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read request body"})
+			return
+		}
+		// 写入配置文件（保持原始 JSON 格式）
+		if err := os.WriteFile(configPath, body, 0644); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		return
+	}
+}
+
 // handleFonts 处理获取系统字体列表的 HTTP 端点。
 // 返回系统已安装的字体名称列表。
 // @param w HTTP 响应写入器

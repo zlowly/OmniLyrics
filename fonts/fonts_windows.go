@@ -4,24 +4,30 @@
 package fonts
 
 import (
+	"log"
 	"os/exec"
 	"strings"
 )
 
 func getSystemFontsImpl() ([]FontInfo, error) {
 	// PowerShell 命令获取系统字体
-	cmd := exec.Command("powershell", "-Command", 
-		"[System.Reflection.Assembly]::LoadWithPartialName('System.Drawing') | Out-Null; " +
-		"(New-Object System.Drawing.Text.InstalledFontCollection).Families | " +
-		"ForEach-Object { $_.Name }")
+	// 使用 -NoProfile 加速启动，设置控制台输出编码为 UTF-8
+	cmd := exec.Command("powershell", "-NoProfile", "-Command",
+		`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; `+
+		`$OutputEncoding = [System.Text.Encoding]::UTF8; `+
+		`[System.Reflection.Assembly]::LoadWithPartialName('System.Drawing') | Out-Null; `+
+		`(New-Object System.Drawing.Text.InstalledFontCollection).Families | `+
+		`ForEach-Object { $_.Name }`)
 
 	output, err := cmd.Output()
 	if err != nil {
+		log.Printf("[Fonts] GetSystemFonts error: %v", err)
 		return getDefaultFonts(), err
 	}
 
 	fonts := parseFontList(string(output))
 	if len(fonts) == 0 {
+		log.Printf("[Fonts] No fonts parsed, using default")
 		return getDefaultFonts(), nil
 	}
 	return fonts, nil

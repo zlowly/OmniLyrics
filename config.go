@@ -50,13 +50,13 @@ func initFlags() {
 	// 端口参数
 	pflag.StringP("port", "p", "8080", "HTTP server port")
 	// 日志参数
-	pflag.String("log-level", "info", "Log level (debug, info, warn, error)")
+	pflag.StringP("log-level", "l", "info", "Log level (debug, info, warn, error)")
 	pflag.String("log-file", "", "Log file path (empty for stdout)")
 	// 目录参数
 	pflag.String("cache-dir", "", "Cache directory path (default: ./Cache)")
 	pflag.String("config-dir", "", "Config directory path (default: ./Config)")
 	// 配置文件参数
-	pflag.String("config", "", "Config file path (default: config.json in executable directory)")
+	pflag.StringP("config", "c", "", "Config file path (default: config.json in executable directory)")
 	// SMTC 模式参数
 	pflag.Bool("mock", false, "Force use mock SMTC backend")
 

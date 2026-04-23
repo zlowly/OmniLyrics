@@ -134,9 +134,16 @@ function cleanLRCInternal(lrc) {
     return cleaned;
 }
 
-const lyricsSources = [
-    { name: 'lrclib', search: searchLrclib }
-];
+const lyricsSources = window.lyricsSources || [];
+let scheduler = null;
+
+async function getScheduler() {
+    if (!scheduler) {
+        scheduler = new window.LyricsScheduler();
+        scheduler.init(window.lyricsSources || []);
+    }
+    return scheduler;
+}
 
 class MotionEngine {
     constructor() {
@@ -198,6 +205,7 @@ class MotionEngine {
         this.songDuration = data.duration || 0;
         const duration = this.songDuration;
         this.lastStatus = data.status || 'Unknown';
+        this.lastAppName = data.appName || '';
 
         // 检测换歌，重置重试计数和歌词
         if (data.title !== this.lastTitle) {
@@ -261,39 +269,34 @@ parseLRC(lrcText) {
             return;
         }
 
-        let lastError = null;
+        const appName = this.lastAppName || '';
+        const sched = await getScheduler();
 
-        for (const source of lyricsSources) {
-            try {
-                let result = await source.search(title, artist, currentDuration);
-                if (result) {
-                    console.log(`[Lyrics] Found from ${source.name}:`, title, artist);
-                    this.lrcData = result.lrcData;
-                    this.updateCache(title, artist, result.lyrics);
-                    fetchRetryCount = 0;
-                    return;
-                }
+        let result = await sched.search(title, artist, currentDuration, appName);
 
-                const titleTw = await convertToTraditional(title);
-                const artistTw = await convertToTraditional(artist);
-                if (titleTw !== title || artistTw !== artist) {
-                    result = await source.search(titleTw, artistTw, currentDuration);
-                    if (result) {
-                        console.log(`[Lyrics] Found from ${source.name} (converted):`, titleTw, artistTw);
-                        this.lrcData = result.lrcData;
-                        this.updateCache(title, artist, result.lyrics);
-                        fetchRetryCount = 0;
-                        return;
-                    }
-                }
-            } catch (e) {
-                lastError = e;
-                console.warn(`[Lyrics] ${source.name} failed:`, e);
+        if (result) {
+            console.log('[Lyrics] Found:', title, artist);
+            this.lrcData = result.lrcData;
+            this.updateCache(title, artist, result.lyrics);
+            fetchRetryCount = 0;
+            return;
+        }
+
+        const titleTw = await convertToTraditional(title);
+        const artistTw = await convertToTraditional(artist);
+        if (titleTw !== title || artistTw !== artist) {
+            result = await sched.search(titleTw, artistTw, currentDuration, appName);
+            if (result) {
+                console.log('[Lyrics] Found (converted):', titleTw, artistTw);
+                this.lrcData = result.lrcData;
+                this.updateCache(title, artist, result.lyrics);
+                fetchRetryCount = 0;
+                return;
             }
         }
 
         fetchRetryCount++;
-        console.warn(`[Lyrics] All sources failed (${fetchRetryCount}/${MAX_RETRY}):`, lastError);
+        console.warn(`[Lyrics] All sources failed (${fetchRetryCount}/${MAX_RETRY})`);
     }
 
     async updateCache(title, artist, lrc) {

@@ -153,4 +153,11 @@ go build -o bridge.exe
 
 ## 许可证
 
-MIT License
+GPL License
+
+
+### 鸣谢与第三方库声明
+
+本项目使用了以下第三方开源库：
+
+GSAP - 由 GreenSock 开发。自 2025 年 5 月起，GSAP 已由 Webflow 赞助并全面开放免费使用（包含所有高级插件），允许个人及商业用途。本项目在遵循其原始版权声明的前提下将其包含在内。

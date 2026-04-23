@@ -65,9 +65,11 @@ func main() {
 	http.HandleFunc("/check_cache", corsHandler(handleCheckCacheWrapper(cacheDir)))
 	http.HandleFunc("/update_cache", corsHandler(handleUpdateCacheWrapper(cacheDir)))
 	http.HandleFunc("/smtc", corsHandler(makeSMTCHandler(smtc)))
+	http.HandleFunc("/decrypt", corsHandler(handleDecrypt))
 	http.HandleFunc("/shutdown", corsHandler(handleShutdown))
 	http.HandleFunc("/index.html", corsHandler(handleIndex))
 	http.HandleFunc("/config", corsHandler(handleConfigWrapper(configDir)))
+	http.HandleFunc("/config/lyrics", corsHandler(handleLyricsConfigWrapper(configDir)))
 	http.HandleFunc("/fonts", corsHandler(handleFonts))
 
 	// 获取基础目录用于定位 web 资源

@@ -61,5 +61,6 @@ func (m *Mock) GetData() (SMTCData, error) {
 		PositionMs: cyclePosition,
 		DurationMs: SongDurationMs,
 		HasSession: true,
+		AppName:    "Mock.Player",
 	}, nil
 }
