@@ -12,9 +12,9 @@ all: build
 build:
 	@echo "Building for $(GOOS)/$(GOARCH)..."
 ifneq ($(GOOS),windows)
-	@$(GO) build -o $(BINARY_NAME) $(MAIN_FILE)
+	@$(GO) build -o $(BINARY_NAME) .
 else
-	@$(GO) build -tags windows -o $(BINARY_NAME).exe $(MAIN_FILE)
+	@$(GO) build -tags windows -o $(BINARY_NAME).exe .
 endif
 
 build-linux:
