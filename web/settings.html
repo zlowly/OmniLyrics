@@ -571,27 +571,27 @@
                  ">Hello World 歌词预览</div>
                </div>
              </div>
-          </div>
-          <div class="card">
-            <div class="card-title">滚动参数</div>
-            <div class="switch-wrapper">
-              <span class="switch-label">显示下一行</span>
-              <label class="switch">
-                <input type="checkbox" id="showNext" checked>
-                <span class="switch-slider"></span>
-              </label>
-            </div>
-            <div class="form-grid" style="margin-top: 16px;">
-              <div class="form-item">
-                <label>下一行透明度</label>
-                <input type="number" id="nextOpacity" value="0.6" step="0.1" min="0.1" max="1">
-              </div>
-              <div class="form-item">
-                <label>滚动时长 (秒)</label>
-                <input type="number" id="scrollDuration" value="0.4" step="0.1" min="0.1">
-              </div>
-            </div>
-          </div>
+</div>
+           <div class="card">
+             <div class="card-title">逐字动画</div>
+             <div class="switch-wrapper">
+               <span class="switch-label">逐字动画</span>
+               <label class="switch">
+                 <input type="checkbox" id="scroll-wordAnimation" checked>
+                 <span class="switch-slider"></span>
+               </label>
+             </div>
+             <div class="form-grid" style="margin-top: 16px;">
+               <div class="form-item">
+                 <label>动画时长 (秒)</label>
+                 <input type="number" id="scroll-animationDuration" value="0.3" step="0.1" min="0.1">
+               </div>
+               <div class="form-item">
+                 <label>当前字缩放</label>
+                 <input type="number" id="scroll-currentScale" value="1.05" step="0.01" min="1" max="2">
+               </div>
+             </div>
+           </div>
         </div>
 
         <div class="content-card" data-panel="mode-blur">
@@ -724,6 +724,9 @@
           showNext: true, 
           nextOpacity: 0.6, 
           scrollDuration: 0.4,
+          wordAnimation: true,
+          animationDuration: 0.3,
+          currentScale: 1.05,
           colors: { text: '#ffffff', bg: '#000000', glowRange: 1, outlineWidth: 1, outlineColor: '#ffffff' },
           font: { size: '2.4rem', weight: 'normal' }
         },
@@ -797,9 +800,9 @@ document.getElementById('fontSize').value = rendererConfig.font?.size || '2.4rem
        document.getElementById('currentScale').value = karaoke.currentScale;
 
 const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.scroll;
-        document.getElementById('showNext').checked = scroll.showNext !== false;
-        document.getElementById('nextOpacity').value = scroll.nextOpacity;
-        document.getElementById('scrollDuration').value = scroll.scrollDuration;
+        document.getElementById('scroll-wordAnimation').checked = scroll.wordAnimation !== false;
+        document.getElementById('scroll-animationDuration').value = scroll.animationDuration;
+        document.getElementById('scroll-currentScale').value = scroll.currentScale;
 
         // scroll 字体和颜色
         if (scroll.colors) {
@@ -968,9 +971,9 @@ const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.
             currentScale: parseFloat(document.getElementById('currentScale').value)
           },
           scroll: {
-            showNext: document.getElementById('showNext').checked,
-            nextOpacity: parseFloat(document.getElementById('nextOpacity').value),
-            scrollDuration: parseFloat(document.getElementById('scrollDuration').value),
+            wordAnimation: document.getElementById('scroll-wordAnimation').checked,
+            animationDuration: parseFloat(document.getElementById('scroll-animationDuration').value),
+            currentScale: parseFloat(document.getElementById('scroll-currentScale').value),
             colors: {
               text: document.getElementById('scroll-textColor').value,
               bg: document.getElementById('scroll-bgColor').value,

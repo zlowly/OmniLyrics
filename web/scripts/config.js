@@ -27,9 +27,9 @@ const SETTINGS_DEFAULT_CONFIG = {
             currentScale: 1.05
         },
         scroll: {
-            showNext: true,
-            nextOpacity: 0.6,
-            scrollDuration: 0.4
+            wordAnimation: true,
+            animationDuration: 0.3,
+            currentScale: 1.05
         },
         blur: {
             visibleLines: 9,
