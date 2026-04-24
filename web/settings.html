@@ -608,65 +608,65 @@
     let lyricsConfig = null;
     let rendererConfig = null;
 
-    // 加载配置
-    async function loadConfig() {
-      // 加载歌词配置
-      try {
-        const res = await fetch(`${CONFIG_API_BASE}/config/lyrics`);
-        if (res.ok) {
-          lyricsConfig = await res.json();
-        }
-      } catch (e) {
-        console.warn('[Config] Use default lyrics config');
-      }
-      if (!lyricsConfig) lyricsConfig = LYRICS_DEFAULT;
+     // 加载配置
+     async function loadConfig() {
+       // 加载歌词配置
+       try {
+         const res = await fetch(`${CONFIG_API_BASE}/config/lyrics`);
+         if (res.ok) {
+           lyricsConfig = await res.json();
+         }
+       } catch (e) {
+         console.warn('[Config] Use default lyrics config');
+       }
+       if (!lyricsConfig) lyricsConfig = LYRICS_DEFAULT;
 
-      // 加载渲染配置
-      await window.configManager.load();
-      rendererConfig = window.configManager.get();
+       // 加载渲染配置
+       await window.configManager.load();
+       rendererConfig = window.configManager.get();
 
-      fillForms();
-    }
+       await fillForms();
+     }
 
-    function fillForms() {
-      // 歌词源配置
-      document.getElementById('lyrics-timeout').value = lyricsConfig.timeout || 5000;
-      document.getElementById('lyrics-retry').value = lyricsConfig.retry || 1;
-      renderSourceList(lyricsConfig.sources || []);
+    async function fillForms() {
+       // 歌词源配置
+       document.getElementById('lyrics-timeout').value = lyricsConfig.timeout || 5000;
+       document.getElementById('lyrics-retry').value = lyricsConfig.retry || 1;
+       renderSourceList(lyricsConfig.sources || []);
 
-      // 渲染配置
-      document.getElementById('textColor').value = (rendererConfig.colors?.text || '#ffffff').slice(0, 7);
-      document.getElementById('bgColor').value = rendererConfig.colors?.bg || '#000000';
-      document.getElementById('fontSize').value = rendererConfig.font?.size || '2.4rem';
-      document.getElementById('glowRange').value = rendererConfig.colors?.glowRange || 1;
-      document.getElementById('glowRangeValue').textContent = document.getElementById('glowRange').value;
-      document.getElementById('outlineWidth').value = rendererConfig.colors?.outlineWidth || 1;
-      document.getElementById('outlineWidthValue').textContent = document.getElementById('outlineWidth').value;
-      document.getElementById('outlineColor').value = rendererConfig.colors?.outlineColor || '#ffffff';
+       // 渲染配置
+       document.getElementById('textColor').value = (rendererConfig.colors?.text || '#ffffff').slice(0, 7);
+       document.getElementById('bgColor').value = rendererConfig.colors?.bg || '#000000';
+       document.getElementById('fontSize').value = rendererConfig.font?.size || '2.4rem';
+       document.getElementById('glowRange').value = rendererConfig.colors?.glowRange || 1;
+       document.getElementById('glowRangeValue').textContent = document.getElementById('glowRange').value;
+       document.getElementById('outlineWidth').value = rendererConfig.colors?.outlineWidth || 1;
+       document.getElementById('outlineWidthValue').textContent = document.getElementById('outlineWidth').value;
+       document.getElementById('outlineColor').value = rendererConfig.colors?.outlineColor || '#ffffff';
 
-      // 加载字体列表并填充
-      loadSystemFonts();
+       // 加载字体列表并填充
+       await loadSystemFonts();
 
-      // 更新预览
-      updateFontPreview();
+       // 更新预览
+       updateFontPreview();
 
-      const karaoke = rendererConfig.modeParams?.karaoke || RENDERER_DEFAULT.modeParams.karaoke;
-      document.getElementById('wordAnimation').checked = karaoke.wordAnimation !== false;
-      document.getElementById('animationDuration').value = karaoke.animationDuration;
-      document.getElementById('currentScale').value = karaoke.currentScale;
+       const karaoke = rendererConfig.modeParams?.karaoke || RENDERER_DEFAULT.modeParams.karaoke;
+       document.getElementById('wordAnimation').checked = karaoke.wordAnimation !== false;
+       document.getElementById('animationDuration').value = karaoke.animationDuration;
+       document.getElementById('currentScale').value = karaoke.currentScale;
 
-      const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.scroll;
-      document.getElementById('showNext').checked = scroll.showNext !== false;
-      document.getElementById('nextOpacity').value = scroll.nextOpacity;
-      document.getElementById('scrollDuration').value = scroll.scrollDuration;
+       const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.scroll;
+       document.getElementById('showNext').checked = scroll.showNext !== false;
+       document.getElementById('nextOpacity').value = scroll.nextOpacity;
+       document.getElementById('scrollDuration').value = scroll.scrollDuration;
 
-      const blur = rendererConfig.modeParams?.blur || RENDERER_DEFAULT.modeParams.blur;
-      document.getElementById('visibleLines').value = blur.visibleLines;
-      document.getElementById('lineSpacing').value = blur.lineSpacing;
-      document.getElementById('opacityDecay').value = blur.opacityDecay;
-      document.getElementById('blurIncrement').value = blur.blurIncrement;
-      document.getElementById('scaleDecay').value = blur.scaleDecay;
-      document.getElementById('blurMax').value = blur.blurMax;
+       const blur = rendererConfig.modeParams?.blur || RENDERER_DEFAULT.modeParams.blur;
+       document.getElementById('visibleLines').value = blur.visibleLines;
+       document.getElementById('lineSpacing').value = blur.lineSpacing;
+       document.getElementById('opacityDecay').value = blur.opacityDecay;
+       document.getElementById('blurIncrement').value = blur.blurIncrement;
+       document.getElementById('scaleDecay').value = blur.scaleDecay;
+       document.getElementById('blurMax').value = blur.blurMax;
     }
 
     // 加载系统字体列表

@@ -48,7 +48,7 @@ var logLevel Level = Info
 // 使用 pflag 替代标准库的 flag，支持更丰富的命令行参数风格。
 func initFlags() {
 	// 端口参数
-	pflag.StringP("port", "p", "8080", "HTTP server port")
+	pflag.StringP("port", "p", "8081", "HTTP server port")
 	// 日志参数
 	pflag.StringP("log-level", "l", "info", "Log level (debug, info, warn, error)")
 	pflag.String("log-file", "", "Log file path (empty for stdout)")
@@ -267,7 +267,7 @@ func initConfig() error {
 // @return string 端口号
 func GetPort() string {
 	if config == nil {
-		return "8080"
+		return "8081"
 	}
 	return config.Port
 }
