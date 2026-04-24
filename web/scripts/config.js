@@ -29,7 +29,8 @@ const SETTINGS_DEFAULT_CONFIG = {
         scroll: {
             wordAnimation: true,
             animationDuration: 0.3,
-            currentScale: 1.05
+            currentScale: 1.05,
+            alignOffset: 0
         },
         blur: {
             visibleLines: 9,

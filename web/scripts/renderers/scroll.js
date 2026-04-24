@@ -21,7 +21,8 @@ class ScrollRenderer extends LyricsRendererBase {
         return {
             wordAnimation: true,
             animationDuration: 0.3,
-            currentScale: 1.05
+            currentScale: 1.05,
+            alignOffset: 0
         };
     }
 
@@ -149,6 +150,7 @@ class ScrollRenderer extends LyricsRendererBase {
             tl.to(el, { filter: `drop-shadow(0 0 ${maxGlow}px rgba(${textR},${textG},${textB},1))`, duration: adjustedDuration, ease: 'none' }, startTime);
             tl.to(el, { scale: currentScale, duration: adjustedDuration, ease: 'none' }, startTime);
             tl.to(el, { filter: `drop-shadow(0 0 ${maxGlow}px rgba(${textR},${textG},${textB},0))`, duration: 1, ease: 'none' }, startTime + adjustedDuration);
+            tl.to(el, { scale: 1, duration: 1, ease: 'none' }, startTime + adjustedDuration);
 
             cumStart += adjustedDuration;
         });
@@ -161,6 +163,14 @@ class ScrollRenderer extends LyricsRendererBase {
         this.currentWords[rowIndex] = words;
         const row = document.createElement('div');
         row.className = 'scroll-row' + (isDim ? ' scroll-row-dim' : '');
+        
+        // 对齐偏移：上行(rowIndex=0)与alignOffset同向，下行(rowIndex=1)与alignOffset反向
+        const offset = this.params.alignOffset || 0;
+        const rowOffset = rowIndex === 0 ? offset : -offset;
+        if (rowOffset !== 0) {
+            row.style.marginLeft = rowOffset + 'px';
+        }
+        
         words.forEach((word, i) => {
             const span = document.createElement('span');
             span.className = 'scroll-word';
