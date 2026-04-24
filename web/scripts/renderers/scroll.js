@@ -19,9 +19,15 @@ class ScrollRenderer extends LyricsRendererBase {
         this.params = config?.modeParams?.scroll || this.getDefaultConfig();
     }
 
-    initStyles() {
-        const colors = window.configManager?.getColors() || {};
+initStyles() {
+        const colors = window.configManager?.getModeColors('scroll') || {};
+        const font = window.configManager?.getModeFont('scroll') || {};        
         document.documentElement.style.setProperty('--fg', colors.text || '#ffffff');
+        
+        const fontFamily = font?.family || 'system-ui, -apple-system, Arial';
+        const fontSize = font?.size || '2.4rem';
+        document.documentElement.style.setProperty('--font-family', fontFamily);
+        document.documentElement.style.setProperty('--font-size', fontSize);
     }
 
     render(frameData) {

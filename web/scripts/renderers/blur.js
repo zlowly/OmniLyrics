@@ -23,9 +23,17 @@ class BlurRenderer extends LyricsRendererBase {
         this.params = config?.modeParams?.blur || this.getDefaultConfig();
     }
 
-    initStyles() {
-        const colors = window.configManager?.getColors() || {};
+initStyles() {
+        const colors = window.configManager?.getModeColors('blur') || {};
+        const font = window.configManager?.getModeFont('blur') || {};
+        
         document.documentElement.style.setProperty('--fg', colors.text || '#ffffff');
+        
+        const fontFamily = font?.family || 'system-ui, -apple-system, Arial';
+        const fontSize = font?.size || '2.4rem';
+        document.documentElement.style.setProperty('--font-family', fontFamily);
+        document.documentElement.style.setProperty('--font-size', fontSize);
+        
         this.textColor = colors.text || '#ffffff';
         this.glowRange = colors.glowRange ?? 1;
         this.outlineWidth = colors.outlineWidth ?? 1;
@@ -33,7 +41,8 @@ class BlurRenderer extends LyricsRendererBase {
     }
 
     getLineHeight() {
-        const fontSize = window.configManager?.getFont()?.size || '2.4rem';
+        const font = window.configManager?.getModeFont('blur') || {};
+        const fontSize = font?.size || '2.4rem';
         const numSize = parseFloat(fontSize) || 2.4;
         const lineSpacing = this.params.lineSpacing ?? 1.5;
         return numSize * lineSpacing * 16;

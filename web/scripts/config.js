@@ -113,6 +113,16 @@ class ConfigManager {
     getModeParams(mode) {
         return this.config?.modeParams?.[mode] || SETTINGS_DEFAULT_CONFIG.modeParams[mode];
     }
+
+    getModeColors(mode) {
+        const modeParams = this.config?.modeParams?.[mode];
+        return modeParams?.colors || this.getColors();
+    }
+
+    getModeFont(mode) {
+        const modeParams = this.config?.modeParams?.[mode];
+        return modeParams?.font || this.getFont();
+    }
 }
 
 const configManager = new ConfigManager();

@@ -394,6 +394,14 @@
     <!-- 展示设置布局 -->
     <div class="main-layout" data-layout="display">
       <div class="sidebar">
+        <div class="form-item">
+          <label>当前模式</label>
+          <select id="currentDisplayMode">
+            <option value="karaoke">单行卡拉OK</option>
+            <option value="scroll">双行滚动</option>
+            <option value="blur">多行渐变模糊</option>
+          </select>
+        </div>
         <div class="sidebar-section-title">展示模式</div>
         <div class="side-option active" data-panel="mode-karaoke">
           <input type="radio" name="display-mode" value="karaoke">
@@ -412,56 +420,72 @@
         <!-- 通用设置 -->
         <div class="content-card active" data-panel="mode-karaoke">
           <div class="card">
-            <div class="card-title">通用设置</div>
-            <div class="form-grid">
-              <div class="form-item">
-                <label>字体颜色</label>
-                <input type="color" id="textColor" value="#ffffff">
-              </div>
-              <div class="form-item">
-                <label>背景色</label>
-                <input type="color" id="bgColor" value="#000000">
-              </div>
-              <div class="form-item">
-                <label>字体大小</label>
-                <input type="text" id="fontSize" value="2.4rem">
-              </div>
-              <div class="form-item">
-                <label>发光范围 (<span id="glowRangeValue">1</span>)</label>
-                <input type="range" id="glowRange" min="0" max="20" value="1">
-              </div>
-              <div class="form-item">
-                <label>轮廓宽度 (<span id="outlineWidthValue">1</span>)</label>
-                <input type="range" id="outlineWidth" min="0" max="10" value="1">
-              </div>
-              <div class="form-item">
-                <label>轮廓颜色</label>
-                <input type="color" id="outlineColor" value="#ffffff">
-              </div>
-              <div class="form-item">
-                <label>西文字体</label>
-                <select id="fontFamilyLatin"></select>
-              </div>
-              <div class="form-item">
-                <label>中日韩字体</label>
-                <select id="fontFamilyCJK"></select>
-              </div>
-              <div class="form-item" style="grid-column: 1 / -1;">
-                <label>预览</label>
-                <div id="fontPreview" style="
-                  padding: 16px; 
-                  background: rgba(0,0,0,0.3); 
-                  border-radius: 6px; 
-                  font-size: 1.5rem;
-                  text-align: center;
-                  color: #fff;
-                  text-shadow: 0 0 10px rgba(0,255,255,0.8);
-                ">Hello World 歌词预览</div>
-              </div>
-            </div>
+<div class="card-title">字体和颜色</div>
+             <div class="form-grid">
+               <div class="form-item">
+                 <label>字体颜色</label>
+                 <input type="color" id="textColor" value="#ffffff">
+               </div>
+               <div class="form-item">
+                 <label>背景色</label>
+                 <input type="color" id="bgColor" value="#000000">
+               </div>
+               <div class="form-item">
+                 <label>字体大小</label>
+                 <input type="text" id="fontSize" value="2.4rem">
+               </div>
+               <div class="form-item">
+                 <label>字体粗细</label>
+                 <select id="fontWeight">
+                   <option value="normal">正常</option>
+                   <option value="bold">粗体</option>
+                   <option value="100">100</option>
+                   <option value="200">200</option>
+                   <option value="300">300</option>
+                   <option value="400">400</option>
+                   <option value="500">500</option>
+                   <option value="600">600</option>
+                   <option value="700">700</option>
+                   <option value="800">800</option>
+                   <option value="900">900</option>
+                 </select>
+               </div>
+               <div class="form-item">
+                 <label>轮廓颜色</label>
+                 <input type="color" id="outlineColor" value="#ffffff">
+               </div>
+               <div class="form-item">
+                 <label>发光范围 (<span id="glowRangeValue">1</span>)</label>
+                 <input type="range" id="glowRange" min="0" max="20" value="1">
+               </div>
+               <div class="form-item">
+                 <label>轮廓宽度 (<span id="outlineWidthValue">1</span>)</label>
+                 <input type="range" id="outlineWidth" min="0" max="10" value="1">
+               </div>
+               <div class="form-item">
+                 <label>西文字体</label>
+                 <select id="fontFamilyLatin"></select>
+               </div>
+               <div class="form-item">
+                 <label>中日韩字体</label>
+                 <select id="fontFamilyCJK"></select>
+               </div>
+               <div class="form-item" style="grid-column: 1 / -1;">
+                 <label>预览</label>
+                 <div id="fontPreview" style="
+                   padding: 16px; 
+                   background: rgba(0,0,0,0.3); 
+                   border-radius: 6px; 
+                   font-size: 1.5rem;
+                   text-align: center;
+                   color: #fff;
+                   text-shadow: 0 0 10px rgba(0,255,255,0.8);
+                 ">Hello World 歌词预览</div>
+               </div>
+             </div>
           </div>
           <div class="card">
-            <div class="card-title">单行卡拉OK 参数</div>
+            <div class="card-title">动画参数</div>
             <div class="switch-wrapper">
               <span class="switch-label">逐字动画</span>
               <label class="switch">
@@ -484,7 +508,7 @@
 
         <div class="content-card" data-panel="mode-scroll">
           <div class="card">
-            <div class="card-title">通用设置</div>
+            <div class="card-title">字体和颜色</div>
             <div class="form-grid">
               <div class="form-item">
                 <label>字体颜色</label>
@@ -498,10 +522,58 @@
                 <label>字体大小</label>
                 <input type="text" id="scroll-fontSize" value="2.4rem">
               </div>
-            </div>
+              <div class="form-item">
+                <label>字体粗细</label>
+                <select id="scroll-fontWeight">
+                  <option value="normal">正常</option>
+                  <option value="bold">粗体</option>
+                  <option value="100">100</option>
+                  <option value="200">200</option>
+                  <option value="300">300</option>
+                  <option value="400">400</option>
+                  <option value="500">500</option>
+                  <option value="600">600</option>
+                  <option value="700">700</option>
+                  <option value="800">800</option>
+                  <option value="900">900</option>
+                </select>
+              </div>
+              <div class="form-item">
+                <label>轮廓颜色</label>
+                <input type="color" id="scroll-outlineColor" value="#ffffff">
+              </div>
+              <div class="form-item">
+                <label>发光范围 (<span id="scroll-glowRangeValue">1</span>)</label>
+                <input type="range" id="scroll-glowRange" min="0" max="20" value="1">
+              </div>
+              <div class="form-item">
+                <label>轮廓宽度 (<span id="scroll-outlineWidthValue">1</span>)</label>
+                <input type="range" id="scroll-outlineWidth" min="0" max="10" value="1">
+              </div>
+              <div class="form-item">
+                <label>西文字体</label>
+                <select id="scroll-fontFamilyLatin"></select>
+              </div>
+<div class="form-item">
+                 <label>中日韩字体</label>
+                 <select id="scroll-fontFamilyCJK"></select>
+               </div>
+               <div class="form-item" style="grid-column: 1 / -1;">
+                 <label>预览</label>
+                 <div id="scroll-fontPreview" style="
+                   padding: 16px; 
+                   background: rgba(0,0,0,0.3); 
+                   border-radius: 6px; 
+                   font-size: 1.5rem;
+                   text-align: center;
+                   color: #fff;
+                   text-shadow: 0 0 10px rgba(0,255,255,0.8);
+                 ">Hello World 歌词预览</div>
+               </div>
+             </div>
           </div>
           <div class="card">
-            <div class="card-title">双行滚动 参数</div>
+            <div class="card-title">滚动参数</div>
             <div class="switch-wrapper">
               <span class="switch-label">显示下一行</span>
               <label class="switch">
@@ -524,7 +596,7 @@
 
         <div class="content-card" data-panel="mode-blur">
           <div class="card">
-            <div class="card-title">通用设置</div>
+            <div class="card-title">字体和颜色</div>
             <div class="form-grid">
               <div class="form-item">
                 <label>字体颜色</label>
@@ -538,10 +610,58 @@
                 <label>字体大小</label>
                 <input type="text" id="blur-fontSize" value="2.4rem">
               </div>
+              <div class="form-item">
+                <label>字体粗细</label>
+                <select id="blur-fontWeight">
+                  <option value="normal">正常</option>
+                  <option value="bold">粗体</option>
+                  <option value="100">100</option>
+                  <option value="200">200</option>
+                  <option value="300">300</option>
+                  <option value="400">400</option>
+                  <option value="500">500</option>
+                  <option value="600">600</option>
+                  <option value="700">700</option>
+                  <option value="800">800</option>
+                  <option value="900">900</option>
+                </select>
+              </div>
+              <div class="form-item">
+                <label>轮廓颜色</label>
+                <input type="color" id="blur-outlineColor" value="#ffffff">
+              </div>
+              <div class="form-item">
+                <label>发光范围 (<span id="blur-glowRangeValue">1</span>)</label>
+                <input type="range" id="blur-glowRange" min="0" max="20" value="1">
+              </div>
+              <div class="form-item">
+                <label>轮廓宽度 (<span id="blur-outlineWidthValue">1</span>)</label>
+                <input type="range" id="blur-outlineWidth" min="0" max="10" value="1">
+              </div>
+              <div class="form-item">
+                <label>西文字体</label>
+                <select id="blur-fontFamilyLatin"></select>
+              </div>
+              <div class="form-item">
+                <label>中日韩字体</label>
+                <select id="blur-fontFamilyCJK"></select>
+              </div>
+              <div class="form-item" style="grid-column: 1 / -1;">
+                <label>预览</label>
+                <div id="blur-fontPreview" style="
+                  padding: 16px; 
+                  background: rgba(0,0,0,0.3); 
+                  border-radius: 6px; 
+                  font-size: 1.5rem;
+                  text-align: center;
+                  color: #fff;
+                  text-shadow: 0 0 10px rgba(0,255,255,0.8);
+                ">Hello World 歌词预览</div>
+              </div>
             </div>
           </div>
           <div class="card">
-            <div class="card-title">多行渐变模糊 参数</div>
+            <div class="card-title">渐变模糊参数</div>
             <div class="form-grid">
               <div class="form-item">
                 <label>显示行数</label>
@@ -597,11 +717,26 @@
     const RENDERER_DEFAULT = {
       mode: 'karaoke',
       colors: { text: '#ffffff', bg: '#000000', glowRange: 1, outlineWidth: 1, outlineColor: '#ffffff' },
-      font: { size: '2.4rem' },
+      font: { size: '2.4rem', weight: 'normal' },
       modeParams: {
         karaoke: { wordAnimation: true, animationDuration: 0.3, currentScale: 1.05 },
-        scroll: { showNext: true, nextOpacity: 0.6, scrollDuration: 0.4 },
-        blur: { visibleLines: 9, lineSpacing: 1.5, opacityDecay: 0.15, blurIncrement: 0.5, scaleDecay: 0.1, blurMax: 6 }
+        scroll: { 
+          showNext: true, 
+          nextOpacity: 0.6, 
+          scrollDuration: 0.4,
+          colors: { text: '#ffffff', bg: '#000000', glowRange: 1, outlineWidth: 1, outlineColor: '#ffffff' },
+          font: { size: '2.4rem', weight: 'normal' }
+        },
+        blur: { 
+          visibleLines: 9, 
+          lineSpacing: 1.5, 
+          opacityDecay: 0.15, 
+          blurIncrement: 0.5, 
+          scaleDecay: 0.1, 
+          blurMax: 6,
+          colors: { text: '#ffffff', bg: '#000000', glowRange: 1, outlineWidth: 1, outlineColor: '#ffffff' },
+          font: { size: '2.4rem', weight: 'normal' }
+        }
       }
     };
 
@@ -634,40 +769,72 @@
        document.getElementById('lyrics-retry').value = lyricsConfig.retry || 1;
        renderSourceList(lyricsConfig.sources || []);
 
-       // 渲染配置
-       document.getElementById('textColor').value = (rendererConfig.colors?.text || '#ffffff').slice(0, 7);
-       document.getElementById('bgColor').value = rendererConfig.colors?.bg || '#000000';
-       document.getElementById('fontSize').value = rendererConfig.font?.size || '2.4rem';
-       document.getElementById('glowRange').value = rendererConfig.colors?.glowRange || 1;
+// 渲染配置
+        const currentMode = rendererConfig.mode || 'karaoke';
+        document.getElementById('currentDisplayMode').value = currentMode;
+
+        document.getElementById('textColor').value = (rendererConfig.colors?.text || '#ffffff').slice(0, 7);
+        document.getElementById('bgColor').value = rendererConfig.colors?.bg || '#000000';
+document.getElementById('fontSize').value = rendererConfig.font?.size || '2.4rem';
+        document.getElementById('fontWeight').value = rendererConfig.font?.weight || 'normal';
+        document.getElementById('glowRange').value = rendererConfig.colors?.glowRange || 1;
        document.getElementById('glowRangeValue').textContent = document.getElementById('glowRange').value;
        document.getElementById('outlineWidth').value = rendererConfig.colors?.outlineWidth || 1;
        document.getElementById('outlineWidthValue').textContent = document.getElementById('outlineWidth').value;
        document.getElementById('outlineColor').value = rendererConfig.colors?.outlineColor || '#ffffff';
 
-       // 加载字体列表并填充
-       await loadSystemFonts();
+// 加载字体列表并填充
+        await loadSystemFonts();
 
-       // 更新预览
-       updateFontPreview();
+        // 更新预览
+        updateFontPreview();
+        updateScrollFontPreview();
+        updateBlurFontPreview();
 
-       const karaoke = rendererConfig.modeParams?.karaoke || RENDERER_DEFAULT.modeParams.karaoke;
+        const karaoke = rendererConfig.modeParams?.karaoke || RENDERER_DEFAULT.modeParams.karaoke;
        document.getElementById('wordAnimation').checked = karaoke.wordAnimation !== false;
        document.getElementById('animationDuration').value = karaoke.animationDuration;
        document.getElementById('currentScale').value = karaoke.currentScale;
 
-       const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.scroll;
-       document.getElementById('showNext').checked = scroll.showNext !== false;
-       document.getElementById('nextOpacity').value = scroll.nextOpacity;
-       document.getElementById('scrollDuration').value = scroll.scrollDuration;
+const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.scroll;
+        document.getElementById('showNext').checked = scroll.showNext !== false;
+        document.getElementById('nextOpacity').value = scroll.nextOpacity;
+        document.getElementById('scrollDuration').value = scroll.scrollDuration;
 
-       const blur = rendererConfig.modeParams?.blur || RENDERER_DEFAULT.modeParams.blur;
-       document.getElementById('visibleLines').value = blur.visibleLines;
-       document.getElementById('lineSpacing').value = blur.lineSpacing;
-       document.getElementById('opacityDecay').value = blur.opacityDecay;
-       document.getElementById('blurIncrement').value = blur.blurIncrement;
-       document.getElementById('scaleDecay').value = blur.scaleDecay;
-       document.getElementById('blurMax').value = blur.blurMax;
-    }
+        // scroll 字体和颜色
+        if (scroll.colors) {
+          document.getElementById('scroll-textColor').value = (scroll.colors.text || '#ffffff').slice(0, 7);
+          document.getElementById('scroll-bgColor').value = scroll.colors.bg || '#000000';
+          document.getElementById('scroll-glowRange').value = scroll.colors.glowRange || 1;
+          document.getElementById('scroll-glowRangeValue').textContent = scroll.colors.glowRange || 1;
+          document.getElementById('scroll-outlineWidth').value = scroll.colors.outlineWidth || 1;
+          document.getElementById('scroll-outlineWidthValue').textContent = scroll.colors.outlineWidth || 1;
+          document.getElementById('scroll-outlineColor').value = scroll.colors.outlineColor || '#ffffff';
+        }
+        document.getElementById('scroll-fontSize').value = scroll.font?.size || '2.4rem';
+        document.getElementById('scroll-fontWeight').value = scroll.font?.weight || 'normal';
+
+        const blur = rendererConfig.modeParams?.blur || RENDERER_DEFAULT.modeParams.blur;
+        document.getElementById('visibleLines').value = blur.visibleLines;
+        document.getElementById('lineSpacing').value = blur.lineSpacing;
+        document.getElementById('opacityDecay').value = blur.opacityDecay;
+        document.getElementById('blurIncrement').value = blur.blurIncrement;
+        document.getElementById('scaleDecay').value = blur.scaleDecay;
+        document.getElementById('blurMax').value = blur.blurMax;
+
+        // blur 字体和颜色
+        if (blur.colors) {
+          document.getElementById('blur-textColor').value = (blur.colors.text || '#ffffff').slice(0, 7);
+          document.getElementById('blur-bgColor').value = blur.colors.bg || '#000000';
+          document.getElementById('blur-glowRange').value = blur.colors.glowRange || 1;
+          document.getElementById('blur-glowRangeValue').textContent = blur.colors.glowRange || 1;
+          document.getElementById('blur-outlineWidth').value = blur.colors.outlineWidth || 1;
+          document.getElementById('blur-outlineWidthValue').textContent = blur.colors.outlineWidth || 1;
+          document.getElementById('blur-outlineColor').value = blur.colors.outlineColor || '#ffffff';
+        }
+        document.getElementById('blur-fontSize').value = blur.font?.size || '2.4rem';
+        document.getElementById('blur-fontWeight').value = blur.font?.weight || 'normal';
+     }
 
     // 加载系统字体列表
     async function loadSystemFonts() {
@@ -679,6 +846,10 @@
         const fonts = data.fonts;
         const latinSelect = document.getElementById('fontFamilyLatin');
         const cjkSelect = document.getElementById('fontFamilyCJK');
+        const scrollLatinSelect = document.getElementById('scroll-fontFamilyLatin');
+        const scrollCjkSelect = document.getElementById('scroll-fontFamilyCJK');
+        const blurLatinSelect = document.getElementById('blur-fontFamilyLatin');
+        const blurCjkSelect = document.getElementById('blur-fontFamilyCJK');
 
         const cjkKeywords = ['YaHei', 'Hei', 'Song', 'Kai', 'Ming', 'Fang', 'SC', 'TC', 'CN', 'JP', 'KR', 'Noto', 'WenQuanYi', 'Droid', 'Source Han', 'PingFang', 'Hiragino'];
 
@@ -691,15 +862,27 @@
           opt1.textContent = name;
           latinSelect.appendChild(opt1);
 
+          const optScroll1 = opt1.cloneNode(true);
+          scrollLatinSelect.appendChild(optScroll1);
+
+          const optBlur1 = opt1.cloneNode(true);
+          blurLatinSelect.appendChild(optBlur1);
+
           if (isCJK) {
             const opt2 = document.createElement('option');
             opt2.value = name;
             opt2.textContent = name;
             cjkSelect.appendChild(opt2);
+
+            const optScroll2 = opt2.cloneNode(true);
+            scrollCjkSelect.appendChild(optScroll2);
+
+            const optBlur2 = opt2.cloneNode(true);
+            blurCjkSelect.appendChild(optBlur2);
           }
         });
 
-        // 设置选中值
+        // 设置选中值 - karaoke
         const fontFamily = rendererConfig.font?.family || 'Arial, Microsoft YaHei';
         const parts = fontFamily.split(',').map(f => f.trim());
         const latin = parts[0] || 'Arial';
@@ -707,6 +890,18 @@
 
         latinSelect.value = latin;
         cjkSelect.value = cjk;
+
+        // 设置选中值 - scroll
+        const scrollFontFamily = rendererConfig.modeParams?.scroll?.font?.family || fontFamily;
+        const scrollParts = scrollFontFamily.split(',').map(f => f.trim());
+        scrollLatinSelect.value = scrollParts[0] || latin;
+        scrollCjkSelect.value = scrollParts[1] || cjk;
+
+        // 设置选中值 - blur
+        const blurFontFamily = rendererConfig.modeParams?.blur?.font?.family || fontFamily;
+        const blurParts = blurFontFamily.split(',').map(f => f.trim());
+        blurLatinSelect.value = blurParts[0] || latin;
+        blurCjkSelect.value = blurParts[1] || cjk;
       } catch (e) {
         console.warn('[Fonts] Load failed:', e);
       }
@@ -745,8 +940,15 @@
     function collectRendererConfig() {
       const latinFont = document.getElementById('fontFamilyLatin').value;
       const cjkFont = document.getElementById('fontFamilyCJK').value;
+
+      const scrollLatinFont = document.getElementById('scroll-fontFamilyLatin').value;
+      const scrollCjkFont = document.getElementById('scroll-fontFamilyCJK').value;
+
+      const blurLatinFont = document.getElementById('blur-fontFamilyLatin').value;
+      const blurCjkFont = document.getElementById('blur-fontFamilyCJK').value;
+
       return {
-        mode: 'karaoke',
+        mode: document.getElementById('currentDisplayMode').value,
         colors: {
           text: document.getElementById('textColor').value,
           bg: document.getElementById('bgColor').value,
@@ -756,6 +958,7 @@
         },
         font: {
           size: document.getElementById('fontSize').value,
+          weight: document.getElementById('fontWeight').value,
           family: `${latinFont}, ${cjkFont}`
         },
         modeParams: {
@@ -767,7 +970,19 @@
           scroll: {
             showNext: document.getElementById('showNext').checked,
             nextOpacity: parseFloat(document.getElementById('nextOpacity').value),
-            scrollDuration: parseFloat(document.getElementById('scrollDuration').value)
+            scrollDuration: parseFloat(document.getElementById('scrollDuration').value),
+            colors: {
+              text: document.getElementById('scroll-textColor').value,
+              bg: document.getElementById('scroll-bgColor').value,
+              glowRange: parseInt(document.getElementById('scroll-glowRange').value),
+              outlineWidth: parseInt(document.getElementById('scroll-outlineWidth').value),
+              outlineColor: document.getElementById('scroll-outlineColor').value
+            },
+            font: {
+              size: document.getElementById('scroll-fontSize').value,
+              weight: document.getElementById('scroll-fontWeight').value,
+              family: `${scrollLatinFont}, ${scrollCjkFont}`
+            }
           },
           blur: {
             visibleLines: parseInt(document.getElementById('visibleLines').value),
@@ -775,7 +990,19 @@
             opacityDecay: parseFloat(document.getElementById('opacityDecay').value),
             blurIncrement: parseFloat(document.getElementById('blurIncrement').value),
             scaleDecay: parseFloat(document.getElementById('scaleDecay').value),
-            blurMax: parseFloat(document.getElementById('blurMax').value)
+            blurMax: parseFloat(document.getElementById('blurMax').value),
+            colors: {
+              text: document.getElementById('blur-textColor').value,
+              bg: document.getElementById('blur-bgColor').value,
+              glowRange: parseInt(document.getElementById('blur-glowRange').value),
+              outlineWidth: parseInt(document.getElementById('blur-outlineWidth').value),
+              outlineColor: document.getElementById('blur-outlineColor').value
+            },
+            font: {
+              size: document.getElementById('blur-fontSize').value,
+              weight: document.getElementById('blur-fontWeight').value,
+              family: `${blurLatinFont}, ${blurCjkFont}`
+            }
           }
         }
       };
@@ -817,6 +1044,26 @@
       });
     });
 
+    // 展示模式切换
+    function updateDisplayModeSidebar(mode) {
+      const sidebar = document.querySelector('[data-layout="display"] .sidebar');
+      sidebar.querySelectorAll('.side-option').forEach(o => o.classList.remove('active'));
+      sidebar.querySelectorAll('.side-option').forEach(o => {
+        if (o.dataset.panel === 'mode-' + mode) {
+          o.classList.add('active');
+          o.querySelector('input').checked = true;
+        }
+      });
+      document.querySelectorAll('[data-layout="display"] .content-card').forEach(card => {
+        card.classList.toggle('active', card.dataset.panel === 'mode-' + mode);
+      });
+    }
+
+    // 当前模式切换事件（仅保存配置，不改变sidebar显示）
+    document.getElementById('currentDisplayMode').addEventListener('change', e => {
+      // 模式选择仅影响保存的配置，不联动sidebar
+    });
+
     // 字体预览更新
     function updateFontPreview() {
       const latinFont = document.getElementById('fontFamilyLatin').value;
@@ -826,12 +1073,58 @@
       const outlineWidth = parseInt(document.getElementById('outlineWidth').value);
       const outlineColor = document.getElementById('outlineColor').value;
       const fontSize = document.getElementById('fontSize').value;
+      const fontWeight = document.getElementById('fontWeight').value;
 
       const preview = document.getElementById('fontPreview');
       if (preview) {
         preview.style.fontFamily = `"${latinFont}", "${cjkFont}", sans-serif`;
         preview.style.color = textColor;
         preview.style.fontSize = fontSize;
+        preview.style.fontWeight = fontWeight;
+        preview.style.textShadow = glowRange > 0 ? `0 0 ${glowRange}px ${textColor}` : 'none';
+        preview.style.webkitTextStroke = outlineWidth > 0 ? `${outlineWidth}px ${outlineColor}` : '0';
+      }
+    }
+
+    // 滚动模式字体预览更新
+    function updateScrollFontPreview() {
+      const latinFont = document.getElementById('scroll-fontFamilyLatin').value;
+      const cjkFont = document.getElementById('scroll-fontFamilyCJK').value;
+      const textColor = document.getElementById('scroll-textColor').value;
+      const glowRange = parseInt(document.getElementById('scroll-glowRange').value);
+      const outlineWidth = parseInt(document.getElementById('scroll-outlineWidth').value);
+      const outlineColor = document.getElementById('scroll-outlineColor').value;
+      const fontSize = document.getElementById('scroll-fontSize').value;
+      const fontWeight = document.getElementById('scroll-fontWeight').value;
+
+      const preview = document.getElementById('scroll-fontPreview');
+      if (preview) {
+        preview.style.fontFamily = `"${latinFont}", "${cjkFont}", sans-serif`;
+        preview.style.color = textColor;
+        preview.style.fontSize = fontSize;
+        preview.style.fontWeight = fontWeight;
+        preview.style.textShadow = glowRange > 0 ? `0 0 ${glowRange}px ${textColor}` : 'none';
+        preview.style.webkitTextStroke = outlineWidth > 0 ? `${outlineWidth}px ${outlineColor}` : '0';
+      }
+    }
+
+    // 模糊模式字体预览更新
+    function updateBlurFontPreview() {
+      const latinFont = document.getElementById('blur-fontFamilyLatin').value;
+      const cjkFont = document.getElementById('blur-fontFamilyCJK').value;
+      const textColor = document.getElementById('blur-textColor').value;
+      const glowRange = parseInt(document.getElementById('blur-glowRange').value);
+      const outlineWidth = parseInt(document.getElementById('blur-outlineWidth').value);
+      const outlineColor = document.getElementById('blur-outlineColor').value;
+      const fontSize = document.getElementById('blur-fontSize').value;
+      const fontWeight = document.getElementById('blur-fontWeight').value;
+
+      const preview = document.getElementById('blur-fontPreview');
+      if (preview) {
+        preview.style.fontFamily = `"${latinFont}", "${cjkFont}", sans-serif`;
+        preview.style.color = textColor;
+        preview.style.fontSize = fontSize;
+        preview.style.fontWeight = fontWeight;
         preview.style.textShadow = glowRange > 0 ? `0 0 ${glowRange}px ${textColor}` : 'none';
         preview.style.webkitTextStroke = outlineWidth > 0 ? `${outlineWidth}px ${outlineColor}` : '0';
       }
@@ -851,6 +1144,39 @@
     document.getElementById('textColor').addEventListener('input', updateFontPreview);
     document.getElementById('outlineColor').addEventListener('input', updateFontPreview);
     document.getElementById('fontSize').addEventListener('input', updateFontPreview);
+    document.getElementById('fontWeight').addEventListener('change', updateFontPreview);
+
+    // scroll 实时预览更新
+    document.getElementById('scroll-glowRange').addEventListener('input', e => {
+      document.getElementById('scroll-glowRangeValue').textContent = e.target.value;
+      updateScrollFontPreview();
+    });
+    document.getElementById('scroll-outlineWidth').addEventListener('input', e => {
+      document.getElementById('scroll-outlineWidthValue').textContent = e.target.value;
+      updateScrollFontPreview();
+    });
+    document.getElementById('scroll-fontFamilyLatin').addEventListener('change', updateScrollFontPreview);
+    document.getElementById('scroll-fontFamilyCJK').addEventListener('change', updateScrollFontPreview);
+    document.getElementById('scroll-textColor').addEventListener('input', updateScrollFontPreview);
+    document.getElementById('scroll-outlineColor').addEventListener('input', updateScrollFontPreview);
+    document.getElementById('scroll-fontSize').addEventListener('input', updateScrollFontPreview);
+    document.getElementById('scroll-fontWeight').addEventListener('change', updateScrollFontPreview);
+
+    // blur 实时预览更新
+    document.getElementById('blur-glowRange').addEventListener('input', e => {
+      document.getElementById('blur-glowRangeValue').textContent = e.target.value;
+      updateBlurFontPreview();
+    });
+    document.getElementById('blur-outlineWidth').addEventListener('input', e => {
+      document.getElementById('blur-outlineWidthValue').textContent = e.target.value;
+      updateBlurFontPreview();
+    });
+    document.getElementById('blur-fontFamilyLatin').addEventListener('change', updateBlurFontPreview);
+    document.getElementById('blur-fontFamilyCJK').addEventListener('change', updateBlurFontPreview);
+    document.getElementById('blur-textColor').addEventListener('input', updateBlurFontPreview);
+    document.getElementById('blur-outlineColor').addEventListener('input', updateBlurFontPreview);
+    document.getElementById('blur-fontSize').addEventListener('input', updateBlurFontPreview);
+    document.getElementById('blur-fontWeight').addEventListener('change', updateBlurFontPreview);
 
     // 保存
     document.getElementById('saveBtn').addEventListener('click', async () => {
