@@ -693,6 +693,26 @@
               </div>
             </div>
           </div>
+          <div class="card">
+            <div class="card-title">逐字动画</div>
+            <div class="switch-wrapper">
+              <span class="switch-label">逐字动画</span>
+              <label class="switch">
+                <input type="checkbox" id="blur-wordAnimation" checked>
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="form-grid" style="margin-top: 16px;">
+              <div class="form-item">
+                <label>动画时长 (秒)</label>
+                <input type="number" id="blur-animationDuration" value="0.3" step="0.1" min="0.1">
+              </div>
+              <div class="form-item">
+                <label>当前字缩放</label>
+                <input type="number" id="blur-currentScale" value="1.05" step="0.01" min="1" max="2">
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -739,6 +759,9 @@
           blurIncrement: 0.5, 
           scaleDecay: 0.1, 
           blurMax: 6,
+          wordAnimation: true,
+          animationDuration: 0.3,
+          currentScale: 1.05,
           colors: { text: '#ffffff', bg: '#000000', glowRange: 1, outlineWidth: 1, outlineColor: '#ffffff' },
           font: { size: '2.4rem', weight: 'normal' }
         }
@@ -793,8 +816,6 @@ document.getElementById('fontSize').value = rendererConfig.font?.size || '2.4rem
 
         // 更新预览
         updateFontPreview();
-        updateScrollFontPreview();
-        updateBlurFontPreview();
 
         const karaoke = rendererConfig.modeParams?.karaoke || RENDERER_DEFAULT.modeParams.karaoke;
        document.getElementById('wordAnimation').checked = karaoke.wordAnimation !== false;
@@ -841,6 +862,13 @@ const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.
         }
         document.getElementById('blur-fontSize').value = blur.font?.size || '2.4rem';
         document.getElementById('blur-fontWeight').value = blur.font?.weight || 'normal';
+        document.getElementById('blur-wordAnimation').checked = blur.wordAnimation !== false;
+        document.getElementById('blur-animationDuration').value = blur.animationDuration;
+        document.getElementById('blur-currentScale').value = blur.currentScale;
+
+        // 更新预览（在所有颜色值加载完成后）
+        updateScrollFontPreview();
+        updateBlurFontPreview();
      }
 
     // 加载系统字体列表
@@ -999,6 +1027,9 @@ const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.
             blurIncrement: parseFloat(document.getElementById('blurIncrement').value),
             scaleDecay: parseFloat(document.getElementById('scaleDecay').value),
             blurMax: parseFloat(document.getElementById('blurMax').value),
+            wordAnimation: document.getElementById('blur-wordAnimation').checked,
+            animationDuration: parseFloat(document.getElementById('blur-animationDuration').value),
+            currentScale: parseFloat(document.getElementById('blur-currentScale').value),
             colors: {
               text: document.getElementById('blur-textColor').value,
               bg: document.getElementById('blur-bgColor').value,

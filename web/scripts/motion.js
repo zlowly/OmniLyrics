@@ -215,6 +215,9 @@ class MotionEngine {
             this.fetchFailed = false;
             console.log('[Motion] New song:', data.title, 'duration:', duration);
 
+            // 通知渲染器重置状态
+            this.onSongChange?.();
+
             // 新歌曲时检查本地缓存
             await this.checkLocalCache(data.title, data.artist, duration);
         }
@@ -348,6 +351,10 @@ parseLRC(lrcText) {
         const deltaPos = pos - (this._prevPosition || pos);
         this.velocity = Math.abs(deltaPos);
         this._prevPosition = pos;
+
+        // 检测播放结束
+        const isSongEnded = this.songDuration > 0 && pos >= this.songDuration;
+
         this.frameData = {
             currentIndex: idx,
             lineProgress: progress,
@@ -355,7 +362,8 @@ parseLRC(lrcText) {
             countdown: isInterlude ? Math.max(0, Math.ceil((curr.time - pos) / 1000)) : 0,
             velocity: this.velocity,
             position: pos,
-            isPlaying: this.lastStatus === 'Playing'
+            isPlaying: this.lastStatus === 'Playing',
+            isSongEnded
         };
     }
 

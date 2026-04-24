@@ -39,8 +39,9 @@ const SETTINGS_DEFAULT_CONFIG = {
             blurIncrement: 0.5,
             scaleDecay: 0.1,
             blurMax: 6,
-            scrollSpeed: 'linear',
-            scrollDuration: 0.5
+            wordAnimation: true,
+            animationDuration: 0.3,
+            currentScale: 1.05
         }
     }
 };

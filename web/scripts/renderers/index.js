@@ -94,6 +94,11 @@ class RendererManager {
                     this.currentRenderer.showConnecting(!connected);
                 }
             };
+            this.motion.onSongChange = () => {
+                if (this.currentRenderer) {
+                    this.currentRenderer.reset();
+                }
+            };
         }
     }
 

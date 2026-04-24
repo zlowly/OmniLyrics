@@ -44,8 +44,11 @@ class ScrollRenderer extends LyricsRendererBase {
         
         const fontFamily = font?.family || 'system-ui, -apple-system, Arial';
         const fontSize = font?.size || '2.4rem';
+        const fontWeight = font?.weight || 'normal';
         document.documentElement.style.setProperty('--font-family', fontFamily);
         document.documentElement.style.setProperty('--font-size', fontSize);
+        document.documentElement.style.setProperty('--font-weight', fontWeight);
+        this.fontWeight = fontWeight;
 
         this.generateWordStyles();
     }
@@ -137,18 +140,20 @@ class ScrollRenderer extends LyricsRendererBase {
         const textB = this.textColor.b;
         const maxGlow = this.glowRange;
         let cumStart = 0;
-        const duration = this.params.animationDuration || 0.3;
-        const currentScale = this.params.currentScale || 1.05;
 
         wordEls.forEach((el, i) => {
             el.style.backgroundPositionX = '100%';
             el.style.filter = `drop-shadow(0 0 0px rgba(${textR},${textG},${textB},0))`;
-            const adjustedDuration = duration;
+
+            const duration = i === 0
+                ? (words[0].time - lineStartTime) / 1000
+                : (words[i].time - words[i - 1].time) / 1000;
+            const adjustedDuration = Math.max(duration, 0.1);
             const startTime = cumStart;
 
             tl.to(el, { backgroundPositionX: '0%', duration: adjustedDuration, ease: 'none' }, startTime);
             tl.to(el, { filter: `drop-shadow(0 0 ${maxGlow}px rgba(${textR},${textG},${textB},1))`, duration: adjustedDuration, ease: 'none' }, startTime);
-            tl.to(el, { scale: currentScale, duration: adjustedDuration, ease: 'none' }, startTime);
+            tl.to(el, { scale: 1.05, duration: adjustedDuration, ease: 'none' }, startTime);
             tl.to(el, { filter: `drop-shadow(0 0 ${maxGlow}px rgba(${textR},${textG},${textB},0))`, duration: 1, ease: 'none' }, startTime + adjustedDuration);
             tl.to(el, { scale: 1, duration: 1, ease: 'none' }, startTime + adjustedDuration);
 
@@ -163,12 +168,21 @@ class ScrollRenderer extends LyricsRendererBase {
         this.currentWords[rowIndex] = words;
         const row = document.createElement('div');
         row.className = 'scroll-row' + (isDim ? ' scroll-row-dim' : '');
+        row.style.fontWeight = this.fontWeight || 'normal';
         
         // 对齐偏移：上行(rowIndex=0)与alignOffset同向，下行(rowIndex=1)与alignOffset反向
         const offset = this.params.alignOffset || 0;
         const rowOffset = rowIndex === 0 ? offset : -offset;
         if (rowOffset !== 0) {
             row.style.marginLeft = rowOffset + 'px';
+        }
+        
+        // wordAnimation 关闭时，给高亮行添加发光效果
+        if (!isDim && this.glowRange > 0 && !this.params.wordAnimation) {
+            const textR = this.textColor.r;
+            const textG = this.textColor.g;
+            const textB = this.textColor.b;
+            row.style.textShadow = `0 0 ${this.glowRange}px rgba(${textR},${textG},${textB},1)`;
         }
         
         words.forEach((word, i) => {
@@ -189,8 +203,27 @@ class ScrollRenderer extends LyricsRendererBase {
         }
 
         const currentIdx = frameData.currentIndex;
-        const { position, isPlaying } = frameData;
+        const { position, isPlaying, isSongEnded } = frameData;
         const lines = motion.lrcData;
+
+        // 播放结束淡出
+        if (isSongEnded && !isPlaying) {
+            if (!this.isFadingOut && this.container) {
+                this.isFadingOut = true;
+                window.gsap.to(this.container, {
+                    opacity: 0,
+                    duration: 0.4,
+                    ease: 'power2.out'
+                });
+            }
+            return;
+        }
+
+        // 恢复显示
+        if (this.isFadingOut && this.container) {
+            this.isFadingOut = false;
+            window.gsap.to(this.container, { opacity: 1, duration: 0.2 });
+        }
 
         if (this.lastLineIndex === -1) {
             this.lastLineIndex = currentIdx;
@@ -225,8 +258,20 @@ class ScrollRenderer extends LyricsRendererBase {
             const highlightIdx = this.currentHighlightRow;
             const dimIdx = 1 - highlightIdx;
             
-            this.rowLyrics[highlightIdx] = lines[currentIdx + 2]?.text || this.rowLyrics[dimIdx];
-            this.rowLyrics[dimIdx] = lines[currentIdx + 1]?.text || '';
+            const nextLine = lines[currentIdx + 1];
+            const nextNextLine = lines[currentIdx + 2];
+            
+            if (!nextLine) {
+                this.container.innerHTML = '';
+                const row0 = this.renderRow(this.rowLyrics[0], 0, this.currentHighlightRow !== 0);
+                const row1 = this.renderRow(this.rowLyrics[1], 1, this.currentHighlightRow !== 1);
+                this.container.appendChild(row0);
+                this.container.appendChild(row1);
+                return;
+            }
+            
+            this.rowLyrics[highlightIdx] = nextNextLine?.text || this.rowLyrics[dimIdx];
+            this.rowLyrics[dimIdx] = nextLine.text || '';
             this.currentHighlightRow = dimIdx;
             
             this.container.innerHTML = '';
@@ -294,6 +339,20 @@ class ScrollRenderer extends LyricsRendererBase {
         super.clear();
         this.rowElements = [null, null];
         this.wordTimelines = [null, null];
+    }
+
+    reset() {
+        super.reset();
+        this.isFadingOut = false;
+        this.rowLyrics = ['', ''];
+        this.rowElements = [null, null];
+        this.currentHighlightRow = 0;
+        this.wordTimelines = [null, null];
+        this.currentWords = [[], []];
+        if (this.interludeEl) {
+            this.interludeEl.remove();
+            this.interludeEl = null;
+        }
     }
 
     destroy() {

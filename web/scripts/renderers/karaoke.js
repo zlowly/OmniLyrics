@@ -41,8 +41,11 @@ class KaraokeRenderer extends LyricsRendererBase {
         // 应用字体设置
         const fontFamily = font?.family || 'system-ui, -apple-system, Arial';
         const fontSize = font?.size || '2.4rem';
+        const fontWeight = font?.weight || 'normal';
         document.documentElement.style.setProperty('--font-family', fontFamily);
         document.documentElement.style.setProperty('--font-size', fontSize);
+        document.documentElement.style.setProperty('--font-weight', fontWeight);
+        this.fontWeight = fontWeight;
 
         // 生成样式：每个字使用 gradient 实现变亮效果
         this.generateWordStyles();
@@ -125,7 +128,26 @@ class KaraokeRenderer extends LyricsRendererBase {
         const line = motion.lrcData[frameData.currentIndex] || motion.lrcData[0];
         if (!line) return;
 
-        const { position, isPlaying, currentIndex } = frameData;
+        const { position, isPlaying, currentIndex, isSongEnded } = frameData;
+
+        // 播放结束淡出
+        if (isSongEnded && !isPlaying) {
+            if (!this.isFadingOut && this.container) {
+                this.isFadingOut = true;
+                window.gsap.to(this.container, {
+                    opacity: 0,
+                    duration: 0.4,
+                    ease: 'power2.out'
+                });
+            }
+            return;
+        }
+
+        // 恢复显示
+        if (this.isFadingOut && this.container) {
+            this.isFadingOut = false;
+            window.gsap.to(this.container, { opacity: 1, duration: 0.2 });
+        }
 
         // 换行检测 - 创建新 timeline
         if (this.lastLineIndex !== currentIndex) {
@@ -133,8 +155,8 @@ class KaraokeRenderer extends LyricsRendererBase {
             const words = line.words || this.splitTextToWords(line.text);
             this.renderNewLine(line.text, words, line.time);
 
-            // 有逐字时间戳时创建 timeline
-            if (line.words && line.words.length > 0) {
+            // 有逐字时间戳且开启了逐字动画时创建 timeline
+            if (this.params.wordAnimation && line.words && line.words.length > 0) {
                 this.createWordTimeline(words, line.time);
 
                 // 首次加载时根据进度设置状态
@@ -195,7 +217,7 @@ class KaraokeRenderer extends LyricsRendererBase {
         words.forEach((word, i) => {
             const el = this.wordElements[i];
             el.style.backgroundPositionX = '100%';
-            el.style.filter = `drop-shadow(0 0 0px rgba(${textR},${textG},${textB},0))`;
+            el.style.filter = `drop-shadow(0 0 0px rgba(${textR},${textG},${textB},0)`;
 
             const duration = i === 0
                 ? (words[0].time - lineStartTime) / 1000
@@ -250,19 +272,47 @@ class KaraokeRenderer extends LyricsRendererBase {
         this.container.innerHTML = '';
         this.wordElements = [];
 
-        // 创建每个字的元素
-        const textR = this.textColor.r;
-        const textG = this.textColor.g;
-        const textB = this.textColor.b;
-        words.forEach((word, i) => {
-            const span = document.createElement('span');
-            span.className = 'karaoke-word';
-            span.textContent = word.text;
-            span.style.backgroundPositionX = '100%';
-            span.style.filter = `drop-shadow(0 0 0px rgba(${textR},${textG},${textB},0))`;
-            this.container.appendChild(span);
-            this.wordElements.push(span);
-        });
+        // wordAnimation 关闭时，显示整行，不创建逐字元素
+        if (!this.params.wordAnimation || !words || words.length === 0) {
+            // 显示整行文本
+            const textEl = document.createElement('div');
+            textEl.className = 'karaoke-line';
+            textEl.textContent = text;
+            textEl.style.fontWeight = this.fontWeight || 'normal';
+            
+            // 发光效果
+            if (this.glowRange > 0) {
+                const textR = this.textColor.r;
+                const textG = this.textColor.g;
+                const textB = this.textColor.b;
+                textEl.style.textShadow = `0 0 ${this.glowRange}px rgba(${textR},${textG},${textB},1)`;
+            }
+            // 轮廓效果
+            if (this.outlineWidth > 0) {
+                const textR = this.textColor.r;
+                const textG = this.textColor.g;
+                const textB = this.textColor.b;
+                const outlineRgba = `rgba(${this.outlineColor.r},${this.outlineColor.g},${this.outlineColor.b},1)`;
+                textEl.style.webkitTextStroke = `${this.outlineWidth}px ${outlineRgba}`;
+            }
+            
+            this.container.appendChild(textEl);
+        } else {
+            // 逐字显示
+            const textR = this.textColor.r;
+            const textG = this.textColor.g;
+            const textB = this.textColor.b;
+            words.forEach((word, i) => {
+                const span = document.createElement('span');
+                span.className = 'karaoke-word';
+                span.textContent = word.text;
+                span.style.fontWeight = this.fontWeight || 'normal';
+                span.style.backgroundPositionX = '100%';
+                span.style.filter = `drop-shadow(0 0 0px rgba(${textR},${textG},${textB},0)`;
+                this.container.appendChild(span);
+                this.wordElements.push(span);
+            });
+        }
 
         window.gsap.fromTo(this.container,
             { opacity: 0, y: 20, rotateX: -15 },
@@ -332,6 +382,13 @@ class KaraokeRenderer extends LyricsRendererBase {
             this.connEl.remove();
             this.connEl = null;
         }
+    }
+
+    reset() {
+        super.reset();
+        this.isFadingOut = false;
+        this.wordTimeline = null;
+        this.currentLineStartTime = 0;
     }
 
     destroy() {

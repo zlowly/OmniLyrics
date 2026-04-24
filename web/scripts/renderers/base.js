@@ -38,6 +38,10 @@ class LyricsRendererBase {
         this.lastLineIndex = -1;
     }
 
+    reset() {
+        this.clear();
+    }
+
     destroy() {
         this.clear();
     }
