@@ -85,6 +85,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request, s smtc.SMTC) {
 		"status":   data.Status,
 		"position": data.PositionMs,
 		"duration": data.DurationMs,
+		"appName":  data.AppName,
 	}
 	lastStatus = result
 json.NewEncoder(w).Encode(result)

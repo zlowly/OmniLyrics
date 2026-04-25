@@ -66,6 +66,8 @@ func main() {
 	http.HandleFunc("/update_cache", corsHandler(handleUpdateCacheWrapper(cacheDir)))
 	http.HandleFunc("/smtc", corsHandler(makeSMTCHandler(smtc)))
 	http.HandleFunc("/decrypt", corsHandler(handleDecrypt))
+	http.HandleFunc("/proxy/qqmusic/search", corsHandler(handleQQMusicSearch))
+	http.HandleFunc("/proxy/qqmusic/lyric", corsHandler(handleQQMusicLyric))
 	http.HandleFunc("/shutdown", corsHandler(handleShutdown))
 	http.HandleFunc("/index.html", corsHandler(handleIndex))
 	http.HandleFunc("/config", corsHandler(handleConfigWrapper(configDir)))

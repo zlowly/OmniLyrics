@@ -69,11 +69,29 @@ class LyricsScheduler {
     groupByPriority(sources, appName) {
         if (!sources || sources.length === 0) return [];
 
-        const enabled = sources.filter(s => s.enabled && this.matchApps(s.apps, appName));
-        const sorted = enabled.sort((a, b) => a.priority - b.priority);
+        // 找出显式指定该 appName 的源（不包括只有 * 的源）
+        const explicitMatches = sources.filter(s =>
+            s.enabled &&
+            s.apps && s.apps.length > 0 &&
+            s.apps.includes(appName) &&
+            !s.apps.every(a => a === '*')
+        );
 
+        // 如果有显式匹配的源，按 priority 排序
+        if (explicitMatches.length > 0) {
+            return this.buildGroups(explicitMatches.sort((a, b) => a.priority - b.priority));
+        }
+
+        // 没有显式匹配时，使用 * 通用源
+        const wildcardSources = sources.filter(s =>
+            s.enabled && s.apps && s.apps.includes('*')
+        );
+        return this.buildGroups(wildcardSources.sort((a, b) => a.priority - b.priority));
+    }
+
+    buildGroups(sortedSources) {
         const groups = [];
-        for (const source of sorted) {
+        for (const source of sortedSources) {
             const lastGroup = groups[groups.length - 1];
             if (lastGroup && lastGroup[0].priority === source.priority) {
                 lastGroup.push(source);

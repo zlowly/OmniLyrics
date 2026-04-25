@@ -1,7 +1,10 @@
 // qqmusic.js - QQ音乐歌词源
-// 功能：搜索歌曲 → 获取QRC加密歌词 → 后端解密
+// 功能：通过后端代理搜索歌曲 → 获取加密歌词 → 后端解密
 
-const QQ_MUSIC_API = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
+const QQ_MUSIC_API_BASE = (() => {
+    const loc = window.location;
+    return `${loc.protocol}//${loc.host}`;
+})();
 
 class QQMusicProvider extends window.LyricsProvider {
     name = 'qqmusic';
@@ -26,100 +29,58 @@ class QQMusicProvider extends window.LyricsProvider {
     }
 
     async searchSong(title, artist) {
-        const query = artist ? `${artist} ${title}` : title;
-        const data = {
-            "req_1": {
-                "method": "DoSearchForQQMusicDesktop",
-                "module": "music.search.SearchCgiService",
-                "param": {
-                    "num_per_page": "10",
-                    "page_num": "1",
-                    "query": query,
-                    "search_type": 0
-                }
-            }
-        };
-
-        const resp = await fetch(QQ_MUSIC_API, {
+        const resp = await fetch(`${QQ_MUSIC_API_BASE}/proxy/qqmusic/search`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Referer': 'https://c.y.qq.com/'
-            },
-            body: JSON.stringify(data)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, artist })
         });
 
+        if (!resp.ok) {
+            console.warn('[QQMusic] Search failed:', resp.status);
+            return null;
+        }
+
         const json = await resp.json();
-        const songs = json?.req_1?.data?.song?.list;
-        if (!songs || songs.length === 0) return null;
+        if (json.error) {
+            console.warn('[QQMusic] Search error:', json.error);
+            return null;
+        }
 
-        const best = this.findBestMatch(songs, duration);
-        return best?.songmid || songs[0]?.songmid;
-    }
-
-    findBestMatch(songs, targetDuration) {
-        if (!targetDuration || !songs) return null;
-        const withDuration = songs.filter(s => s.duration > 0);
-        if (withDuration.length === 0) return null;
-
-        return withDuration.reduce((best, song) => {
-            const diff = Math.abs(song.duration - targetDuration);
-            const bestDiff = best ? Math.abs(best.duration - targetDuration) : Infinity;
-            return diff < bestDiff ? song : best;
-        }, null);
+        return json.songMid || null;
     }
 
     async getEncryptedLyrics(songMid) {
-        const currentMillis = Date.now();
-        const data = new URLSearchParams({
-            'callback': 'MusicJsonCallback_lrc',
-            'pcachetime': currentMillis.toString(),
-            'songmid': songMid,
-            'g_tk': '5381',
-            'jsonpCallback': 'MusicJsonCallback_lrc',
-            'loginUin': '0',
-            'hostUin': '0',
-            'format': 'jsonp',
-            'inCharset': 'utf8',
-            'outCharset': 'utf8',
-            'notice': '0',
-            'platform': 'yqq',
-            'needNewCode': '0'
+        const resp = await fetch(`${QQ_MUSIC_API_BASE}/proxy/qqmusic/lyric`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ songMid })
         });
 
-        const resp = await fetch(
-            `https://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?${data}`,
-            { headers: { 'Referer': 'https://c.y.qq.com/' } }
-        );
-
-        const text = await resp.text();
-        const json = this.parseJSONP(text, 'MusicJsonCallback_lrc');
-        return json?.lyric || null;
-    }
-
-    parseJSONP(text, callback) {
-        const prefix = callback + '(';
-        if (!text.startsWith(prefix)) return null;
-        const jsonStr = text.slice(prefix.length, -1);
-        try {
-            return JSON.parse(jsonStr);
-        } catch {
+        if (!resp.ok) {
+            console.warn('[QQMusic] Lyric fetch failed:', resp.status);
             return null;
         }
+
+        const json = await resp.json();
+        if (json.error) {
+            console.warn('[QQMusic] Lyric error:', json.error);
+            return null;
+        }
+
+        return json.encrypted || null;
     }
 
     async decrypt(encryptedHex) {
-        const API_BASE = window.location.origin;
-
-        const resp = await fetch(`${API_BASE}/decrypt`, {
+        const resp = await fetch(`${QQ_MUSIC_API_BASE}/decrypt`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ encrypted: encryptedHex })
         });
 
         if (!resp.ok) return null;
+
         const json = await resp.json();
-        return json?.lyrics || null;
+        return json.lyrics || null;
     }
 }
 

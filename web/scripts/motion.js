@@ -24,20 +24,32 @@ async function convertToTraditional(text) {
 
 async function searchLrclib(title, artist, currentDuration) {
     const searchUrl = `${LRCLIB_API.replace('/get', '/search')}?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist || '')}`;
+    console.log('[Lrclib] Searching:', title, artist, 'duration:', currentDuration);
+    console.log('[Lrclib] URL:', searchUrl);
+    
     const res = await fetch(searchUrl);
+    console.log('[Lrclib] Search response status:', res.status);
     if (!res.ok) return null;
+    
     const results = await res.json();
+    console.log('[Lrclib] Search results count:', results?.length);
     if (!Array.isArray(results) || results.length === 0) return null;
 
     const withDuration = results.filter(r => r.duration && r.duration > 0);
+    console.log('[Lrclib] Results with duration:', withDuration?.length);
     const best = withDuration.length === 0
         ? results[0]
         : withDuration.sort((a, b) => Math.abs(a.duration - currentDuration) - Math.abs(b.duration - currentDuration))[0];
+    
+    console.log('[Lrclib] Best match:', best?.track_name, 'duration:', best?.duration);
 
     const getUrl = `${LRCLIB_API.replace('/get', '/get')}/${best.id}`;
     const getRes = await fetch(getUrl);
+    console.log('[Lrclib] Get response status:', getRes.status);
     if (!getRes.ok) return null;
+    
     const json = await getRes.json();
+    console.log('[Lrclib] Got lyrics, has synced:', !!json?.syncedLyrics, 'has plain:', !!json?.plainLyrics);
     if (!json?.syncedLyrics && !json?.plainLyrics) return null;
 
     const lyrics = json.syncedLyrics || json.plainLyrics;
@@ -266,6 +278,10 @@ parseLRC(lrcText) {
 
     async fetchOnlineLyrics(title, artist, currentDuration) {
         if (!title || !this.online) return;
+        if (!currentDuration || currentDuration <= 0) {
+            console.warn('[Lyrics] No duration, skip search');
+            return;
+        }
         if (fetchRetryCount >= MAX_RETRY) {
             console.warn('[Lyrics] Max retries reached, giving up');
             this.fetchFailed = true;
@@ -376,6 +392,22 @@ parseLRC(lrcText) {
 // 修复变量名冲突
 const motionEngine = new MotionEngine();
 window.motion = motionEngine;
+
+// 歌词 provider 定义
+class LrclibProvider {
+    name = 'lrclib';
+    async search(title, artist, duration) {
+        return searchLrclib(title, artist, duration);
+    }
+}
+
+// 注册到全局，LyricsScheduler 初始化时会读取
+// QQMusicProvider 来自 qqmusic.js（已在 index.html 中加载）
+const providers = [new LrclibProvider()];
+if (window.QQMusicProvider) {
+    providers.push(new window.QQMusicProvider());
+}
+window.lyricsSources = providers;
 
 // 重试计数
 let fetchRetryCount = 0;
