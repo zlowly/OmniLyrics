@@ -2,6 +2,7 @@
 .opencode/
 Cache/
 Config/
+tests/
 .editorconfig
 *.exe
 *.exe~

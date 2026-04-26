@@ -58,7 +58,9 @@ func main() {
 		}
 	}
 
-	// 注册各路由处理器，路径映射到对应的处理函数
+    // 注册 kgmusic 路由
+    RegisterKGMusicRoutes()
+    // 注册各路由处理器，路径映射到对应的处理函数
 	http.HandleFunc("/health", corsHandler(handleHealth))
 	http.HandleFunc("/status", corsHandler(makeStatusHandler(smtc)))
 	http.HandleFunc("/hold", corsHandler(handleHold))
@@ -66,8 +68,9 @@ func main() {
 	http.HandleFunc("/update_cache", corsHandler(handleUpdateCacheWrapper(cacheDir)))
 	http.HandleFunc("/smtc", corsHandler(makeSMTCHandler(smtc)))
 	http.HandleFunc("/decrypt", corsHandler(handleDecrypt))
-	http.HandleFunc("/proxy/qqmusic/search", corsHandler(handleQQMusicSearch))
-	http.HandleFunc("/proxy/qqmusic/lyric", corsHandler(handleQQMusicLyric))
+    http.HandleFunc("/proxy/qqmusic/search", corsHandler(handleQQMusicSearch))
+    http.HandleFunc("/proxy/qqmusic/lyric", corsHandler(handleQQMusicLyric))
+    // kgmusic routes are registered by RegisterKGMusicRoutes()
 	http.HandleFunc("/shutdown", corsHandler(handleShutdown))
 	http.HandleFunc("/index.html", corsHandler(handleIndex))
 	http.HandleFunc("/config", corsHandler(handleConfigWrapper(configDir)))
