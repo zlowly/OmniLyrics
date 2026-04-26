@@ -16,6 +16,17 @@ class LyricsScheduler {
         for (const p of providerInstances) {
             this.providers.set(p.name, p);
         }
+        // Auto-register kgmusic provider if available and not already registered
+        try {
+            if (!this.providers.has('kgmusic') && window.KGMusicProvider) {
+                const kgProvider = new window.KGMusicProvider();
+                kgProvider.name = 'kgmusic';
+                this.providers.set(kgProvider.name, kgProvider);
+                console.log('[Lyrics] KGMusicProvider auto-registered');
+            }
+        } catch (e) {
+            console.warn('[Lyrics] KGMusicProvider auto-register failed:', e);
+        }
         console.log('[Lyrics] Scheduler initialized with providers:', [...this.providers.keys()]);
     }
 
@@ -158,4 +169,19 @@ class LyricsScheduler {
     }
 }
 
+// 注册到全局
 window.LyricsScheduler = LyricsScheduler;
+
+// 自动初始化所有 providers（包含 kgmusic）
+try {
+    const providers = [];
+    if (window.LRCLibProvider) providers.push(new window.LRCLibProvider());
+    if (window.QQMusicProvider) providers.push(new window.QQMusicProvider());
+    if (window.KGMusicProvider) providers.push(new window.KGMusicProvider());
+
+    const scheduler = new LyricsScheduler();
+    scheduler.init(providers);
+    window.lyricsScheduler = scheduler;  // also export as lowercase for motion.js
+} catch (e) {
+    console.warn('[Lyrics] Provider init failed:', e);
+}

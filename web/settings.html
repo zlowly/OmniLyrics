@@ -964,7 +964,10 @@ const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.
         const enabled = item.querySelector('.source-enabled').checked;
         const priority = parseInt(item.querySelector('.source-priority').value);
         const apps = item.querySelector('.source-apps').value.split(',').map(a => a.trim()).filter(a => a);
-        sources.push({ name: ['lrclib', 'qqmusic'][i], enabled, priority, apps });
+        // 动态获取源名称，适应将来新增的歌词源
+        const nameEl = item.querySelector('.source-name');
+        const name = nameEl ? nameEl.textContent.trim() : '';
+        sources.push({ name, enabled, priority, apps });
       });
       return {
         timeout: parseInt(document.getElementById('lyrics-timeout').value),

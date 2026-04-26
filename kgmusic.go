@@ -7,8 +7,10 @@ import (
     "encoding/json"
     "fmt"
     "io/ioutil"
+    "log"
     "net/http"
     "net/url"
+    "strconv"
     "strings"
 )
 
@@ -82,9 +84,25 @@ func kgmusicSearchHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
     first, _ := infoList[0].(map[string]interface{})
+    // 直接使用 album_audio_id 作为 songId，并将数值类型转换为字符串
     id := getString(first["album_audio_id"])
     if id == "" {
-        id = getString(first["id"])
+        // album_audio_id 可能是数字，需要转成字符串
+        if v, ok := first["album_audio_id"]; ok {
+            switch t := v.(type) {
+            case float64:
+                id = strconv.FormatFloat(t, 'f', 0, 64)
+            case int:
+                id = strconv.Itoa(t)
+            case int64:
+                id = strconv.FormatInt(t, 10)
+            }
+        }
+    }
+    // 若 album_audio_id 无法转为有效字符串，直接返回错误
+    if id == "" {
+        json.NewEncoder(w).Encode(map[string]interface{}{"error": "songId derivation failed: album_audio_id is not string"})
+        return
     }
     hash := getString(first["hash"])
     duration := getInt(first["duration"])
@@ -114,6 +132,7 @@ func kgmusicLyricHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
     urlStr := "http://krcs.kugou.com/search?ver=1&man=no&client=pc&hash=" + url.QueryEscape(req.Hash) + "&album_audio_id=" + url.QueryEscape(req.SongID) + "&lrctxt=1"
+    log.Printf("[KGMusic] lyric request: songId=%s, hash=%s, url=%s", req.SongID, req.Hash, urlStr)
     resp, err := http.Get(urlStr)
     if err != nil {
         json.NewEncoder(w).Encode(map[string]interface{}{"error": err.Error()})
@@ -121,6 +140,7 @@ func kgmusicLyricHandler(w http.ResponseWriter, r *http.Request) {
     }
     defer resp.Body.Close()
     data, _ := ioutil.ReadAll(resp.Body)
+    log.Printf("[KGMusic] lyric response status=%d, headers=%v, body=%s", resp.StatusCode, resp.Header, string(data))
     var result map[string]interface{}
     if err := json.Unmarshal(data, &result); err != nil {
         json.NewEncoder(w).Encode(map[string]interface{}{"error": err.Error()})
@@ -136,6 +156,18 @@ func kgmusicLyricHandler(w http.ResponseWriter, r *http.Request) {
     accesskey := getString(c0["accesskey"])
     duration := getInt(c0["duration"])
     encrypted := getString(c0["encrypted"])
+
+    // 如果 encrypted 为空但有 id 和 accesskey，自动获取 LRC 格式歌词
+    if encrypted == "" && id != "" && accesskey != "" {
+        lrc, err := downloadLRCFromKugou(id, accesskey)
+        if err == nil && lrc != "" {
+            json.NewEncoder(w).Encode(map[string]interface{}{
+                "id": id, "accesskey": accesskey, "duration": duration, "encrypted": encrypted, "lyrics": lrc,
+            })
+            return
+        }
+    }
+
     json.NewEncoder(w).Encode(map[string]interface{}{
         "id": id, "accesskey": accesskey, "duration": duration, "encrypted": encrypted,
     })
@@ -151,11 +183,21 @@ func kgmusicDecryptHandler(w http.ResponseWriter, r *http.Request) {
     }
     var req struct{ Encrypted string `json:"encrypted"` }
     body, _ := ioutil.ReadAll(r.Body)
+    log.Printf("[KGMusic] decrypt request: headers=%v, body=%s", r.Header, string(body))
     if err := json.Unmarshal(body, &req); err != nil {
         json.NewEncoder(w).Encode(map[string]string{"error": "Invalid JSON"})
         return
     }
+    if req.Encrypted == "" {
+        log.Printf("[KGMusic] decrypt: encrypted is empty, returning empty lyrics")
+        json.NewEncoder(w).Encode(map[string]string{"lyrics": ""})
+        return
+    }
     // 使用占位的解密实现，后续替换为完整的 KRC 解密
+    log.Printf("[KGMusic] decrypt: encrypted length=%d, first 100 chars=%s", len(req.Encrypted), func() string {
+        if len(req.Encrypted) > 100 { return req.Encrypted[:100] }
+        return req.Encrypted
+    }())
     out, err := krcDecryptFromBase64(req.Encrypted)
     if err != nil {
         json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -252,4 +294,34 @@ func krcDecryptFromBase64(encoded string) (string, error) {
     } else {
         return "", err2
     }
+}
+
+// downloadLRCFromKugou 使用 id 和 accesskey 从酷狗下载 LRC 格式歌词
+func downloadLRCFromKugou(id, accesskey string) (string, error) {
+    urlStr := "http://lyrics.kugou.com/download?ver=1&client=pc&id=" + url.QueryEscape(id) + "&accesskey=" + url.QueryEscape(accesskey) + "&fmt=lrc"
+    log.Printf("[KGMusic] download LRC request: id=%s, accesskey=%s, url=%s", id, accesskey, urlStr)
+    resp, err := http.Get(urlStr)
+    if err != nil {
+        log.Printf("[KGMusic] download LRC error: %v", err)
+        return "", err
+    }
+    defer resp.Body.Close()
+
+    data, _ := ioutil.ReadAll(resp.Body)
+    log.Printf("[KGMusic] download LRC response: status=%d, headers=%v, body=%s", resp.StatusCode, resp.Header, string(data))
+    var result map[string]interface{}
+    if err := json.Unmarshal(data, &result); err != nil {
+        return "", err
+    }
+
+    content := getString(result["content"])
+    if content == "" {
+        return "", nil
+    }
+
+    decoded, err := base64.StdEncoding.DecodeString(content)
+    if err != nil {
+        return "", err
+    }
+    return string(decoded), nil
 }

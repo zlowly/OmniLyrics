@@ -151,8 +151,14 @@ let scheduler = null;
 
 async function getScheduler() {
     if (!scheduler) {
-        scheduler = new window.LyricsScheduler();
-        scheduler.init(window.lyricsSources || []);
+        if (window.lyricsScheduler) {
+            // 使用 index.js 已初始化的调度器
+            scheduler = window.lyricsScheduler;
+        } else {
+            scheduler = new window.LyricsScheduler();
+            scheduler.init(window.lyricsSources || []);
+            console.log('[Motion] Scheduler initialized');
+        }
     }
     return scheduler;
 }
