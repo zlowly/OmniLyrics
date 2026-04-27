@@ -5,6 +5,7 @@ package smtc
 
 import (
 	"errors"
+	"log"
 	"regexp"
 	"strings"
 	"sync"
@@ -22,6 +23,11 @@ var errNotInitialized = errors.New("kugou catcher not initialized")
 var errSliderNotFound  = errors.New("slider not found")
 var errInvalidValue    = errors.New("invalid value")
 var errCoolingDown    = errors.New("cooling down")
+
+// KugouCatcherDebugEnabled 控制酷狗抓取器调试日志的输出
+// true: 详细诊断（频繁读取成功）
+// false: 仅关键里程碑（初始化、缓存失效/重建）和错误
+var KugouCatcherDebugEnabled = false
 
 type KugouCatcher struct {
 	mu       sync.Mutex
@@ -62,13 +68,18 @@ func (k *KugouCatcher) GetPosition() (posMs, durMs int64, err error) {
 		if err == nil {
 			k.lastSuccess = time.Now()
 			k.failCount = 0
+			if KugouCatcherDebugEnabled {
+				log.Printf("[Kugou] readSlider hit: pos=%d, dur=%d", posMs, durMs)
+			}
 			return posMs, durMs, nil
 		}
 		k.releaseSlider()
+		log.Println("[Kugou] cache invalidated, slider read failed")
 	}
 
 	// 检查是否需要冷却
 	if k.failCount >= maxFailCount && time.Since(k.lastSuccess) < reconnectDelay {
+		log.Printf("[Kugou] cooling down: failCount=%d, lastSuccess=%v", k.failCount, k.lastSuccess)
 		return 0, 0, errCoolingDown
 	}
 
@@ -76,8 +87,10 @@ func (k *KugouCatcher) GetPosition() (posMs, durMs int64, err error) {
 	if err := k.findSlider(); err != nil {
 		k.failCount++
 		k.valid = false
+		log.Printf("[Kugou] findSlider failed: %v", err)
 		return 0, 0, err
 	}
+	log.Println("[Kugou] findSlider success: slider recreated")
 
 	// 读取进度
 	posMs, durMs, err = k.readSlider()
@@ -85,6 +98,7 @@ func (k *KugouCatcher) GetPosition() (posMs, durMs int64, err error) {
 		k.releaseSlider()
 		k.valid = false
 		k.failCount++
+		log.Printf("[Kugou] readSlider after find failed: %v", err)
 		return 0, 0, err
 	}
 

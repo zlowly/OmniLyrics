@@ -13,18 +13,28 @@ import (
     "github.com/saltosystems/winrt-go/windows/media/control"
 )
 
+// WinRTWinRTDebugEnabled 控制 SMTC WinRT 调试日志的输出
+// 设置为 true 时输出详细诊断信息，false 时仅输出关键步骤和错误
+var WinRTDebugEnabled = false
+
 // WinRT 是 SMTC 接口的 Windows WinRT 实现。
 // 该实现通过 Windows Runtime API 获取系统媒体传输控制（SMTC）的实时数据。
 // 仅在 Windows 平台上编译和使用。
 type WinRT struct {
     // lastData 缓存上一次获取的媒体数据，用于可能的派生操作
     lastData SMTCData
-    // ensureInit 保证 COM 和 SMTC 会话管理器初始化仅进行一次
+    // initMutex 保护初始化状态，防止 sync.Once 失败后无法重试
+    initMutex sync.Mutex
+    // initOnce 保证 COM 和 SMTC 会话管理器初始化仅进行一次
     initOnce sync.Once
     // initErr 保存初始化过程中的错误
     initErr error
     // mgr 持久化的会话管理器引用，供后续 GetData 调用复用
     mgr *control.GlobalSystemMediaTransportControlsSessionManager
+    // initAttempts 记录初始化尝试次数，用于诊断
+    initAttempts int
+    // lastInitTime 记录上次初始化时间
+    lastInitTime time.Time
 }
 
 // NewWinRT 创建一个新的 WinRT 实例。
@@ -34,14 +44,67 @@ func NewWinRT() *WinRT {
     return &WinRT{}
 }
 
+// Reset 重置 WinRT 实例，允许重新初始化
+// 用于初始化失败后重试
+func (w *WinRT) Reset() {
+    w.initMutex.Lock()
+    defer w.initMutex.Unlock()
+
+    if WinRTDebugEnabled {
+        log.Printf("[SMTC WinRT] Reset requested, was initialized: mgr=%v, initErr=%v, attempts=%d", w.mgr != nil, w.initErr, w.initAttempts)
+    }
+
+    // 释放 SMTC 管理器
+    if w.mgr != nil {
+        w.mgr = nil
+    }
+
+    // 重置状态，允许重新初始化
+    w.initOnce = sync.Once{}
+    w.initErr = nil
+}
+
 // ensureInit 在第一次调用 GetData 时进行一次性初始化
 // 包含 COM 初始化以及 SMTC 会话管理器的获取与缓存
 func (w *WinRT) ensureInit() {
+    w.initMutex.Lock()
+    w.initAttempts++
+    w.lastInitTime = time.Now()
+    attempt := w.initAttempts
+    w.initMutex.Unlock()
+
+    if WinRTDebugEnabled {
+        log.Printf("[SMTC WinRT] ensureInit called, attempt=%d, current state: mgr=%v, initErr=%v", attempt, w.mgr != nil, w.initErr)
+    }
+
     w.initOnce.Do(func() {
-        w.initErr = ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
+        if WinRTDebugEnabled {
+            log.Printf("[SMTC WinRT] Starting initialization (attempt %d)...", attempt)
+        }
+
+        w.initErr = ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED)
         if w.initErr != nil {
-            log.Printf("[SMTC WinRT] COM init failed: %v", w.initErr)
-            return
+            errMsg := w.initErr.Error()
+            if errMsg == "RPC_E_CHANGED_MODE" {
+                if WinRTDebugEnabled {
+                    log.Printf("[SMTC WinRT] COM already initialized (MULTITHREADED conflict), assuming already initialized")
+                }
+                w.initErr = nil
+            } else {
+                w.initErr = ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
+                if w.initErr != nil {
+                    errMsg := w.initErr.Error()
+                    if errMsg == "RPC_E_CHANGED_MODE" {
+                        if WinRTDebugEnabled {
+                            log.Printf("[SMTC WinRT] COM already initialized (APARTMENTTHREADED conflict), assuming already initialized")
+                        }
+                        w.initErr = nil
+                    } else {
+                        log.Printf("[SMTC WinRT] COM init failed: %v", w.initErr)
+                        return
+                    }
+                }
+            }
         }
         log.Println("[SMTC WinRT] COM initialized OK")
 
@@ -51,7 +114,9 @@ func (w *WinRT) ensureInit() {
             w.initErr = err
             return
         }
-        log.Println("[SMTC WinRT] SMTC manager request sent, waiting...")
+        if WinRTDebugEnabled {
+            log.Println("[SMTC WinRT] SMTC manager request sent, waiting...")
+        }
 
         time.Sleep(100 * time.Millisecond)
         resultPtr, err := asyncOp.GetResults()
@@ -69,11 +134,24 @@ func (w *WinRT) ensureInit() {
 // 该方法调用系统媒体传输控制 API，获取当前播放会话的详细信息。
 // @return SMTCData 返回包含当前媒体信息的结构体；error 返回可能发生的错误
 func (w *WinRT) GetData() (SMTCData, error) {
-    // 初始化并尽量复用初始化结果
+    // 初始化
     w.ensureInit()
+
+    // 如果初始化失败，尝试重置并重试（最多一次）
     if w.initErr != nil {
-        return SMTCData{Status: "Error", HasSession: false, Title: w.initErr.Error()}, nil
+        log.Printf("[SMTC WinRT] Initial attempt failed: %v, attempting reset...", w.initErr)
+
+        w.Reset()
+        w.ensureInit()
+
+        // 如果重试后仍然失败，记录详细错误
+        if w.initErr != nil {
+            log.Printf("[SMTC WinRT] Retry also failed: %v", w.initErr)
+            return SMTCData{Status: "Error", HasSession: false, Title: w.initErr.Error()}, nil
+        }
+        log.Println("[SMTC WinRT] Retry initialization succeeded")
     }
+
     if w.mgr == nil {
         return SMTCData{Status: "NoSession", HasSession: false}, nil
     }

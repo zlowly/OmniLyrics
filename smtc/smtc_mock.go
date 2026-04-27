@@ -2,6 +2,7 @@ package smtc
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -63,4 +64,19 @@ func (m *Mock) GetData() (SMTCData, error) {
 		HasSession: true,
 		AppName:    "Mock.Player",
 	}, nil
+}
+
+// Reset Mock 实现的重置方法。Mock 是无状态的，调用此方法无实际效果。
+func (m *Mock) Reset() {
+	// Mock 无需重置
+}
+
+// SetWinRTDebug Mock 实现的重置方法（无实际效果）
+func (m *Mock) SetWinRTDebug(enabled bool) {
+	log.Printf("[SMTC Mock] SetWinRTDebug(%v) - no-op", enabled)
+}
+
+// SetKugouCatcherDebug Mock 实现的重置方法（无实际效果）
+func (m *Mock) SetKugouCatcherDebug(enabled bool) {
+	log.Printf("[SMTC Mock] SetKugouCatcherDebug(%v) - no-op", enabled)
 }

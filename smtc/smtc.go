@@ -27,4 +27,10 @@ type SMTC interface {
 	// GetData 获取当前的媒体播放数据。
 	// @return SMTCData 返回包含当前媒体信息的结构体；error 返回可能发生的错误
 	GetData() (SMTCData, error)
+	// Reset 重置后端，允许重新初始化。某些后端实现可能不需要此方法。
+	Reset()
+	// SetWinRTDebug 设置 WinRT 调试模式
+	SetWinRTDebug(enabled bool)
+	// SetKugouCatcherDebug 设置酷狗抓取器调试模式
+	SetKugouCatcherDebug(enabled bool)
 }

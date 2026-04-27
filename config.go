@@ -298,3 +298,12 @@ func GetMock() bool {
 	}
 	return config.Mock
 }
+
+// GetLogLevel 返回日志级别字符串。
+// @return string 日志级别 ("debug", "info", "warn", "error")
+func GetLogLevel() string {
+	if config == nil {
+		return "info"
+	}
+	return config.Log.Level
+}
