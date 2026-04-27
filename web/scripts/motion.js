@@ -208,7 +208,7 @@ class MotionEngine {
             } catch (e) {
                 this.handleDisconnect();
             }
-        }, 200);
+        }, 250);
     }
 
     handleDisconnect() {

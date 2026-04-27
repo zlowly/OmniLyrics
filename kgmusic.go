@@ -10,6 +10,7 @@ import (
     "log"
     "net/http"
     "net/url"
+    "regexp"
     "strconv"
     "strings"
 )
@@ -155,21 +156,55 @@ func kgmusicLyricHandler(w http.ResponseWriter, r *http.Request) {
     id := getString(c0["id"])
     accesskey := getString(c0["accesskey"])
     duration := getInt(c0["duration"])
-    encrypted := getString(c0["encrypted"])
 
-    // 如果 encrypted 为空但有 id 和 accesskey，自动获取 LRC 格式歌词
-    if encrypted == "" && id != "" && accesskey != "" {
-        lrc, err := downloadLRCFromKugou(id, accesskey)
-        if err == nil && lrc != "" {
-            json.NewEncoder(w).Encode(map[string]interface{}{
-                "id": id, "accesskey": accesskey, "duration": duration, "encrypted": encrypted, "lyrics": lrc,
-            })
-            return
+    if id == "" || accesskey == "" {
+        json.NewEncoder(w).Encode(map[string]interface{}{
+            "id": id, "accesskey": accesskey, "duration": duration, "lyrics": "",
+        })
+        return
+    }
+
+    // 优先下载 KRC 格式（逐字）
+    downloadURL := "http://lyrics.kugou.com/download?ver=1&client=pc&id=" + url.QueryEscape(id) + "&accesskey=" + url.QueryEscape(accesskey) + "&fmt=krc"
+    resp, err = http.Get(downloadURL)
+    if err == nil {
+        defer resp.Body.Close()
+        data, _ = ioutil.ReadAll(resp.Body)
+        var dlResult map[string]interface{}
+        if json.Unmarshal(data, &dlResult) == nil {
+            if content := getString(dlResult["content"]); content != "" {
+                if krcLyrics, err := krcDecryptFromBase64(content); err == nil && krcLyrics != "" {
+                    lrcLyrics := krc2lrc(krcLyrics)
+                    json.NewEncoder(w).Encode(map[string]interface{}{
+                        "id": id, "accesskey": accesskey, "duration": duration, "lyrics": lrcLyrics,
+                    })
+                    return
+                }
+            }
+        }
+    }
+
+    // 降级到 LRC 格式（逐行）
+    downloadURL = "http://lyrics.kugou.com/download?ver=1&client=pc&id=" + url.QueryEscape(id) + "&accesskey=" + url.QueryEscape(accesskey) + "&fmt=lrc"
+    resp, err = http.Get(downloadURL)
+    if err == nil {
+        defer resp.Body.Close()
+        data, _ = ioutil.ReadAll(resp.Body)
+        var dlResult map[string]interface{}
+        if json.Unmarshal(data, &dlResult) == nil {
+            if content := getString(dlResult["content"]); content != "" {
+                if decoded, err := base64.StdEncoding.DecodeString(content); err == nil {
+                    json.NewEncoder(w).Encode(map[string]interface{}{
+                        "id": id, "accesskey": accesskey, "duration": duration, "lyrics": string(decoded),
+                    })
+                    return
+                }
+            }
         }
     }
 
     json.NewEncoder(w).Encode(map[string]interface{}{
-        "id": id, "accesskey": accesskey, "duration": duration, "encrypted": encrypted,
+        "id": id, "accesskey": accesskey, "duration": duration, "lyrics": "",
     })
 }
 
@@ -272,12 +307,12 @@ func krcDecrypt(encryptedLyrics []byte) (string, error) {
         return "", err
     }
     defer zlibReader.Close()
-    output := make([]byte, 4096)
-    n, err := zlibReader.Read(output)
-    if err != nil && err.Error() != "EOF" {
+
+    output, err := ioutil.ReadAll(zlibReader)
+    if err != nil {
         return "", err
     }
-    return string(output[:n]), nil
+    return string(output), nil
 }
 
 func krcDecryptFromBase64(encoded string) (string, error) {
@@ -324,4 +359,74 @@ func downloadLRCFromKugou(id, accesskey string) (string, error) {
         return "", err
     }
     return string(decoded), nil
+}
+
+// krc2lrc 将KRC格式歌词转换为LRC格式
+func krc2lrc(krc string) string {
+    var result strings.Builder
+    lines := strings.Split(krc, "\n")
+
+    linePattern := regexp.MustCompile(`^\[(\d+),(\d+)\](.*)$`)
+    wordPatternInline := regexp.MustCompile(`\[(\d+),(\d+)\]<(\d+),(\d+),\d+>([^<]+)`)
+    wordPatternNoInline := regexp.MustCompile(`<(\d+),(\d+),\d+>([^<]+)`)
+
+    for _, rawLine := range lines {
+        line := strings.TrimSpace(rawLine)
+        if line == "" {
+            continue
+        }
+
+        lineMatch := linePattern.FindStringSubmatch(line)
+        if lineMatch == nil {
+            result.WriteString(line)
+            result.WriteString("\n")
+            continue
+        }
+
+        lineStart, _ := strconv.Atoi(lineMatch[1])
+        lineContent := lineMatch[3]
+
+        wordsInline := wordPatternInline.FindAllStringSubmatch(lineContent, -1)
+        wordsNoInline := wordPatternNoInline.FindAllStringSubmatch(lineContent, -1)
+
+        if len(wordsInline) > 0 || len(wordsNoInline) > 0 {
+            var lrcLine strings.Builder
+            for _, w := range wordsInline {
+                var wordStart int
+                inlineOffset, _ := strconv.Atoi(w[1])
+                wordOffset, _ := strconv.Atoi(w[3])
+                wordStart = lineStart + inlineOffset + wordOffset
+                wordContent := strings.TrimSpace(w[6])
+
+                mins := wordStart / 60000
+                secs := (wordStart % 60000) / 1000
+                ms := (wordStart % 1000) / 10
+                fmt.Fprintf(&lrcLine, "[%02d:%02d.%02d]%s", mins, secs, ms, wordContent)
+            }
+            for _, w := range wordsNoInline {
+                var wordStart int
+                wordOffset, _ := strconv.Atoi(w[1])
+                wordStart = lineStart + wordOffset
+                wordContent := strings.TrimSpace(w[3])
+
+                mins := wordStart / 60000
+                secs := (wordStart % 60000) / 1000
+                ms := (wordStart % 1000) / 10
+                fmt.Fprintf(&lrcLine, "[%02d:%02d.%02d]%s", mins, secs, ms, wordContent)
+            }
+            if lrcLine.Len() > 0 {
+                result.WriteString(lrcLine.String())
+                result.WriteString("\n")
+            }
+        } else {
+            if lineContent != "" {
+                mins := lineStart / 60000
+                secs := (lineStart % 60000) / 1000
+                ms := (lineStart % 1000) / 10
+                fmt.Fprintf(&result, "[%02d:%02d.%02d]%s\n", mins, secs, ms, lineContent)
+            }
+        }
+    }
+
+    return result.String()
 }

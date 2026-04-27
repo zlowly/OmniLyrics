@@ -4,7 +4,7 @@
 package smtc
 
 import (
-    "fmt"
+    "log"
     "sync"
     "time"
     "unsafe"
@@ -30,7 +30,7 @@ type WinRT struct {
 // NewWinRT 创建一个新的 WinRT 实例。
 // @return *WinRT 返回指向 WinRT 结构体的指针
 func NewWinRT() *WinRT {
-    fmt.Println("[SMTC] WinRT backend initialized (winrt-go)")
+    log.Println("[SMTC] WinRT backend initialized (winrt-go)")
     return &WinRT{}
 }
 
@@ -38,25 +38,29 @@ func NewWinRT() *WinRT {
 // 包含 COM 初始化以及 SMTC 会话管理器的获取与缓存
 func (w *WinRT) ensureInit() {
     w.initOnce.Do(func() {
-        // 初始化 COM，使用单线程模型
         w.initErr = ole.CoInitializeEx(0, ole.COINIT_APARTMENTTHREADED)
-        // 如果初始化返回错误且非已初始化，无需继续
         if w.initErr != nil {
+            log.Printf("[SMTC WinRT] COM init failed: %v", w.initErr)
             return
         }
-        // 异步获取全局系统媒体传输控制会话管理器
+        log.Println("[SMTC WinRT] COM initialized OK")
+
         asyncOp, err := control.GlobalSystemMediaTransportControlsSessionManagerRequestAsync()
         if err != nil {
+            log.Printf("[SMTC WinRT] Request SMTC manager failed: %v", err)
             w.initErr = err
             return
         }
-        // 等待异步结果，避免太长阻塞
+        log.Println("[SMTC WinRT] SMTC manager request sent, waiting...")
+
         time.Sleep(100 * time.Millisecond)
         resultPtr, err := asyncOp.GetResults()
         if err != nil {
+            log.Printf("[SMTC WinRT] Get results failed: %v", err)
             w.initErr = err
             return
         }
+        log.Println("[SMTC WinRT] SMTC manager initialized OK")
         w.mgr = (*control.GlobalSystemMediaTransportControlsSessionManager)(unsafe.Pointer(resultPtr))
     })
 }
@@ -86,14 +90,19 @@ func (w *WinRT) GetData() (SMTCData, error) {
         Status:     "Playing",
     }
 
-    // 尝试获取媒体属性（标题、艺术家、专辑名）
-    // 这些属性可能不可用，因此使用条件检查
+    // 尝试获取媒体属性（标题、艺术家、专辑名），增加重试机制
+    var mediaPropsPtr unsafe.Pointer
     propsAsync, err := session.TryGetMediaPropertiesAsync()
     if err == nil && propsAsync != nil {
-        time.Sleep(50 * time.Millisecond)
-        mediaPropsPtr, _ := propsAsync.GetResults()
+        for retry := 0; retry < 3; retry++ {
+            time.Sleep(100 * time.Millisecond)
+            ptr, err := propsAsync.GetResults()
+            if err == nil && ptr != nil {
+                mediaPropsPtr = ptr
+                break
+            }
+        }
         if mediaPropsPtr != nil {
-            // 转换为媒体属性类型并逐个获取属性值
             mediaProps := (*control.GlobalSystemMediaTransportControlsSessionMediaProperties)(unsafe.Pointer(mediaPropsPtr))
             if title, err := mediaProps.GetTitle(); err == nil && title != "" {
                 data.Title = title

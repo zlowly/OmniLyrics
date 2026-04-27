@@ -87,8 +87,15 @@ func handleStatus(w http.ResponseWriter, r *http.Request, s smtc.SMTC) {
 		"duration": data.DurationMs,
 		"appName":  data.AppName,
 	}
+
+	// 如果 title 是 "Unknown"，说明属性获取失败，返回缓存的 title/artist
+	if data.Title == "Unknown" && lastStatus != nil {
+		result["title"] = lastStatus["title"]
+		result["artist"] = lastStatus["artist"]
+	}
+
 	lastStatus = result
-json.NewEncoder(w).Encode(result)
+	json.NewEncoder(w).Encode(result)
 }
 
 // handleHold 处理暂停/恢复状态更新的 HTTP 端点。

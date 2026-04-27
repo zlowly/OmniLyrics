@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -92,12 +93,11 @@ func krcDecrypt(encryptedLyrics []byte) (string, error) {
 	}
 	defer zlibReader.Close()
 
-	output := make([]byte, 4096)
-	n, err := zlibReader.Read(output)
-	if err != nil && err.Error() != "EOF" {
+	output, err := ioutil.ReadAll(zlibReader)
+	if err != nil {
 		return "", err
 	}
-	return string(output[:n]), nil
+	return string(output), nil
 }
 
 // krcDecryptFromBase64 从Base64编码的密文解密歌词
@@ -107,6 +107,83 @@ func krcDecryptFromBase64(encoded string) (string, error) {
 		return "", err
 	}
 	return krcDecrypt(decoded)
+}
+
+// krc2lrc 将KRC格式歌词转换为LRC格式
+// KRC格式: [行起始,持续]<字偏移,字持续,0>字内容
+// LRC格式: [mm:ss.xx]字内容
+func krc2lrc(krc string) string {
+	var result strings.Builder
+	lines := strings.Split(krc, "\n")
+
+	linePattern := regexp.MustCompile(`^\[(\d+),(\d+)\](.*)$`)
+	// 两种模式：1)无行内标签 <偏移,持续,0>字  2)有行内标签 [行内偏移,行内持续]<偏移,持续,0>字
+	wordPatternNoInline := regexp.MustCompile(`<(\d+),(\d+),\d+>([^<]+)`)
+	wordPatternInline := regexp.MustCompile(`\[(\d+),(\d+)\]<(\d+),(\d+),\d+>([^<]+)`)
+
+	for _, rawLine := range lines {
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			continue
+		}
+
+		// 解析行时间标签: [起始时间,持续时间]内容
+		lineMatch := linePattern.FindStringSubmatch(line)
+		if lineMatch == nil {
+			// 不是时间标签行，可能是标签如 [ti:xxx]，直接复制
+			result.WriteString(line)
+			result.WriteString("\n")
+			continue
+		}
+
+		lineStart, _ := strconv.Atoi(lineMatch[1])
+		lineContent := lineMatch[3]
+
+		// 先尝试匹配有行内标签的格式
+		wordsInline := wordPatternInline.FindAllStringSubmatch(lineContent, -1)
+		// 再尝试匹配无行内标签的格式
+		wordsNoInline := wordPatternNoInline.FindAllStringSubmatch(lineContent, -1)
+
+		if len(wordsInline) > 0 || len(wordsNoInline) > 0 {
+			var lrcLine strings.Builder
+			for _, w := range wordsInline {
+				var wordStart int
+				inlineOffset, _ := strconv.Atoi(w[1])
+				wordOffset, _ := strconv.Atoi(w[3])
+				wordStart = lineStart + inlineOffset + wordOffset
+				wordContent := strings.TrimSpace(w[6])
+
+				mins := wordStart / 60000
+				secs := (wordStart % 60000) / 1000
+				ms := (wordStart % 1000) / 10
+				fmt.Fprintf(&lrcLine, "[%02d:%02d.%02d]%s", mins, secs, ms, wordContent)
+			}
+			for _, w := range wordsNoInline {
+				var wordStart int
+				wordOffset, _ := strconv.Atoi(w[1])
+				wordStart = lineStart + wordOffset
+				wordContent := strings.TrimSpace(w[3])
+
+				mins := wordStart / 60000
+				secs := (wordStart % 60000) / 1000
+				ms := (wordStart % 1000) / 10
+				fmt.Fprintf(&lrcLine, "[%02d:%02d.%02d]%s", mins, secs, ms, wordContent)
+			}
+			if lrcLine.Len() > 0 {
+				result.WriteString(lrcLine.String())
+				result.WriteString("\n")
+			}
+		} else {
+			if lineContent != "" {
+				mins := lineStart / 60000
+				secs := (lineStart % 60000) / 1000
+				ms := (lineStart % 1000) / 10
+				fmt.Fprintf(&result, "[%02d:%02d.%02d]%s\n", mins, secs, ms, lineContent)
+			}
+		}
+	}
+
+	return result.String()
 }
 
 // init 初始化客户端，获取设备标识符dfid
@@ -559,7 +636,12 @@ func main() {
 		log.Fatalf("获取歌词失败: %v", err)
 	}
 
-	// 显示歌词内容
-	fmt.Println("歌词内容:")
+	// 显示原始KRC歌词内容
+	fmt.Println("原始KRC歌词内容:")
 	fmt.Println(lyricContent)
+
+	// 转换为LRC格式
+	fmt.Println("\n转换后的LRC歌词内容:")
+	lrcContent := krc2lrc(lyricContent)
+	fmt.Println(lrcContent)
 }
