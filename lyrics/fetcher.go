@@ -84,7 +84,7 @@ func (f *Fetcher) Fetch(ctx context.Context, req *FetchRequest) *FetchResult {
 		req.Title, req.Artist, req.AppName)
 
 	// 步骤1：检查缓存
-	if found, content, err := CheckCache(f.cacheDir, req.Title, req.Artist); err == nil && found {
+	if found, content, err := CheckCache(f.cacheDir, req.Title, req.Artist, req.Duration); err == nil && found {
 		logger.Infof("[Lyrics] 缓存命中")
 		return &FetchResult{
 			Found:  true,
@@ -122,7 +122,7 @@ func (f *Fetcher) Fetch(ctx context.Context, req *FetchRequest) *FetchResult {
 			logger.Infof("[Lyrics] %s 找到歌词", src.Name())
 
 			// 保存到缓存
-			if err := UpdateCache(f.cacheDir, req.Title, req.Artist, lyrics); err != nil {
+			if err := UpdateCache(f.cacheDir, req.Title, req.Artist, req.Duration, lyrics); err != nil {
 				logger.Warnf("[Lyrics] 缓存保存失败: %v", err)
 			}
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -122,6 +123,8 @@ type CacheRequest struct {
 	Artist string `json:"artist"`
 	// LRC 歌词内容（LRC 格式）
 	LRC string `json:"lrc"`
+	// Duration 歌曲时长（秒），用于区分不同版本的歌词
+	Duration int `json:"duration"`
 }
 
 // handleCheckCacheWrapper 创建处理歌词检查请求的 HTTP 处理器。
@@ -135,7 +138,7 @@ func handleCheckCacheWrapper(cacheDir string) http.HandlerFunc {
 }
 
 // handleCheckCache 处理检查歌词缓存请求的 HTTP 端点。
-// 通过 title 和 artist 查询参数查找对应的 .lrc 文件。
+// 通过 title、artist 和 duration（秒）查询参数查找对应的 .lrc 文件。
 // @param w HTTP 响应写入器
 // @param r HTTP 请求对象
 // @param cacheDir 缓存目录路径
@@ -143,9 +146,13 @@ func handleCheckCache(w http.ResponseWriter, r *http.Request, cacheDir string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	// 从查询参数获取标题和艺术家
+	// 从查询参数获取标题、艺术家和时长
 	title := r.URL.Query().Get("title")
 	artist := r.URL.Query().Get("artist")
+	duration := 0
+	if d := r.URL.Query().Get("duration"); d != "" {
+		fmt.Sscanf(d, "%d", &duration)
+	}
 
 	// 如果缺少必要参数，返回未找到状态
 	if title == "" && artist == "" {
@@ -156,8 +163,18 @@ func handleCheckCache(w http.ResponseWriter, r *http.Request, cacheDir string) {
 		return
 	}
 
-	// 将艺术家和标题组合作为文件名，注意去除非法字符
-	safeName := sanitizeFilename(artist + "_" + title)
+	// 验证 duration 必须为正数
+	if duration <= 0 {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"found":   false,
+			"content": "",
+			"error":  "invalid duration",
+		})
+		return
+	}
+
+	// 将艺术家、标题和时长组合作为文件名，注意去除非法字符
+	safeName := sanitizeFilename(artist + "_" + title + "_" + fmt.Sprint(duration))
 	filePath := filepath.Join(cacheDir, safeName+".lrc")
 
 	// 检查文件是否存在
@@ -197,7 +214,7 @@ func handleUpdateCacheWrapper(cacheDir string) http.HandlerFunc {
 }
 
 // handleUpdateCache 处理更新歌词缓存请求的 HTTP 端点。
-// 接收 POST 请求，JSON body 包含 title、artist 和 lrc_content 字段。
+// 接收 POST 请求，JSON body 包含 title、artist、duration（秒）和 lrc 字段。
 // @param w HTTP 响应写入器
 // @param r HTTP 请求对象
 // @param cacheDir 缓存目录路径
@@ -231,13 +248,13 @@ func handleUpdateCache(w http.ResponseWriter, r *http.Request, cacheDir string) 
 	}
 
 	// 验证必要字段
-	if req.Title == "" || req.Artist == "" || req.LRC == "" {
-		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Missing required fields"})
+	if req.Title == "" || req.Artist == "" || req.LRC == "" || req.Duration <= 0 {
+		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Missing required fields or invalid duration"})
 		return
 	}
 
-	// 生成安全的文件名并写入缓存
-	safeName := sanitizeFilename(req.Artist + "_" + req.Title)
+	// 生成安全的文件名并写入缓存（包含时长信息）
+	safeName := sanitizeFilename(req.Artist + "_" + req.Title + "_" + fmt.Sprint(req.Duration))
 	filePath := filepath.Join(cacheDir, safeName+".lrc")
 
 	if err := os.WriteFile(filePath, []byte(req.LRC), 0644); err != nil {

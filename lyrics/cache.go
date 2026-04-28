@@ -1,6 +1,7 @@
 package lyrics
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,22 +28,27 @@ func sanitizeFilename(name string) string {
 }
 
 // CheckCache 检查歌词缓存是否存在。
-// 通过 title 和 artist 组合查找对应的 .lrc 文件。
+// 通过 title、artist 和 duration（秒）组合查找对应的 .lrc 文件。
 // 参数：
 //   - cacheDir: 缓存目录路径
 //   - title: 歌曲标题
 //   - artist: 艺术家名称
+//   - duration: 歌曲时长（秒），用于区分不同版本的歌词
 //
 // 返回：
 //   - found: 是否找到缓存
 //   - content: 歌词内容（如果找到）
 //   - err: 错误信息
-func CheckCache(cacheDir, title, artist string) (found bool, content string, err error) {
+func CheckCache(cacheDir, title, artist string, duration int) (found bool, content string, err error) {
 	if title == "" && artist == "" {
 		return false, "", nil
 	}
 
-	safeName := sanitizeFilename(artist + "_" + title)
+	if duration <= 0 {
+		return false, "", nil
+	}
+
+	safeName := sanitizeFilename(artist + "_" + title + "_" + fmt.Sprint(duration))
 	filePath := filepath.Join(cacheDir, safeName+".lrc")
 
 	if _, err := os.Stat(filePath); err == nil {
@@ -58,21 +64,22 @@ func CheckCache(cacheDir, title, artist string) (found bool, content string, err
 }
 
 // UpdateCache 更新歌词缓存。
-// 将歌词内容写入以 "艺术家_标题.lrc" 命名的文件中。
+// 将歌词内容写入以 "艺术家_标题_时长.lrc" 命名的文件中。
 // 参数：
 //   - cacheDir: 缓存目录路径
 //   - title: 歌曲标题
 //   - artist: 艺术家名称
+//   - duration: 歌曲时长（秒），用于区分不同版本的歌词
 //   - lrc: LRC 格式的歌词内容
 //
 // 返回：
 //   - error: 错误信息（如果有）
-func UpdateCache(cacheDir, title, artist, lrc string) error {
-	if title == "" || artist == "" || lrc == "" {
+func UpdateCache(cacheDir, title, artist string, duration int, lrc string) error {
+	if title == "" || artist == "" || lrc == "" || duration <= 0 {
 		return nil
 	}
 
-	safeName := sanitizeFilename(artist + "_" + title)
+	safeName := sanitizeFilename(artist + "_" + title + "_" + fmt.Sprint(duration))
 	filePath := filepath.Join(cacheDir, safeName+".lrc")
 
 	if err := os.WriteFile(filePath, []byte(lrc), 0644); err != nil {
