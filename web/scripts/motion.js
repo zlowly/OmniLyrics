@@ -112,6 +112,7 @@ class MotionEngine {
         this.fetchRetryCount = 0;
         this.lastAppName = '';
         this.lastStatus = 'Unknown';
+        this.lastDuration = 0; // 新增：记录上一次的duration
         this.init();
     }
 
@@ -152,11 +153,21 @@ class MotionEngine {
         this.songDuration = data.duration || 0;
         const duration = this.songDuration;
         this.lastStatus = data.status || 'Unknown';
+        
+        // 检测应用名称是否变化（此时this.lastAppName仍是上一次的值）
+        const appNameChanged = data.appName !== this.lastAppName;
+        
+        // 更新应用名称
         this.lastAppName = data.appName || '';
 
-        // 检测换歌，重置重试计数和歌词
-        if (data.title !== this.lastTitle) {
+        // 检测切歌：标题变化 或 应用变化 或 duration变化（且duration>0）
+        const songChanged = data.title !== this.lastTitle || 
+                           appNameChanged || 
+                           (duration > 0 && duration !== this.lastDuration);
+        
+        if (songChanged && data.title) {
             this.lastTitle = data.title;
+            this.lastDuration = duration; // 记录新的duration
             this.lrcData = [];
             this.fetchRetryCount = 0;
             this.fetchFailed = false;
@@ -165,10 +176,11 @@ class MotionEngine {
             // 通知渲染器重置状态
             this.onSongChange?.();
 
-            // 新歌曲时调用后端 /lyrics 接口获取歌词
-            if (data.title) {
-                await this.fetchLyrics(data.title, data.artist, Math.floor(duration / 1000), this.lastAppName);
-            }
+            // 获取歌词（duration可能仍为0，fetchLyrics内部会处理）
+            await this.fetchLyrics(data.title, data.artist, Math.floor(duration / 1000), this.lastAppName);
+        } else if (!songChanged) {
+            // 未切歌，更新lastDuration（用于下次比较）
+            this.lastDuration = duration;
         }
 
         this.lastPosition = position;
