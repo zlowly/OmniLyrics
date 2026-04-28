@@ -13,13 +13,8 @@ import (
 	"syscall"
 
 	"github.com/omnilyrics/bridge/lyrics"
+	"github.com/omnilyrics/bridge/smtc"
 )
-
-// smtcImpl 是 SMTC 后端的全局实例，用于设置调试标志
-var smtcImpl interface {
-	SetWinRTDebug(enabled bool)
-	SetKugouCatcherDebug(enabled bool)
-}
 
 // main 是程序的入口点，启动 HTTP 服务器并注册所有路由处理器。
 // 该函数执行以下操作：
@@ -36,15 +31,12 @@ func main() {
 	}
 
 	// 根据操作系统选择合适的 SMTC 后端
-	smtcBackend := NewSMTC()
-
-	// 设置调试标志接口
-	smtcImpl = smtcBackend
+	smtcBackend := smtc.NewSMTC(GetMock())
 
 	// 根据日志级别设置调试标志
 	isDebug := GetLogLevel() == "debug"
-	smtcImpl.SetWinRTDebug(isDebug)
-	smtcImpl.SetKugouCatcherDebug(isDebug)
+	smtcBackend.SetWinRTDebug(isDebug)
+	smtcBackend.SetKugouCatcherDebug(isDebug)
 
 	// 获取缓存和配置目录（来自配置系统，支持命令行和配置文件自定义）
 	cacheDir := GetCacheDir()
@@ -81,8 +73,6 @@ func main() {
 		}
 	}
 
-	// 注册 kgmusic 路由
-	RegisterKGMusicRoutes()
 	// 注册各路由处理器，路径映射到对应的处理函数
 	http.HandleFunc("/lyrics", corsHandler(handleLyrics))
 	http.HandleFunc("/health", corsHandler(handleHealth))
@@ -91,8 +81,6 @@ func main() {
 	http.HandleFunc("/check_cache", corsHandler(handleCheckCacheWrapper(cacheDir)))
 	http.HandleFunc("/update_cache", corsHandler(handleUpdateCacheWrapper(cacheDir)))
 	http.HandleFunc("/smtc", corsHandler(makeSMTCHandler(smtcBackend)))
-	http.HandleFunc("/decrypt", corsHandler(handleDecrypt))
-	// kgmusic routes are registered by RegisterKGMusicRoutes()
 	http.HandleFunc("/shutdown", corsHandler(handleShutdown))
 	http.HandleFunc("/index.html", corsHandler(handleIndex))
 	http.HandleFunc("/config", corsHandler(handleConfigWrapper(configDir)))
