@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -9,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+
+	"github.com/omnilyrics/bridge/lyrics"
 )
 
 // smtcImpl 是 SMTC 后端的全局实例，用于设置调试标志
@@ -46,6 +50,11 @@ func main() {
 	cacheDir := GetCacheDir()
 	configDir := GetConfigDir()
 
+	// 初始化歌词获取器
+	if err := lyrics.InitFetcher(cacheDir, configDir); err != nil {
+		log.Printf("[Warn] 歌词获取器初始化失败: %v", err)
+	}
+
 	// 创建缓存目录，用于存储歌词文件
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		log.Printf("[Warn] Cannot create Cache dir: %v", err)
@@ -75,6 +84,7 @@ func main() {
 	// 注册 kgmusic 路由
 	RegisterKGMusicRoutes()
 	// 注册各路由处理器，路径映射到对应的处理函数
+	http.HandleFunc("/lyrics", corsHandler(handleLyrics))
 	http.HandleFunc("/health", corsHandler(handleHealth))
 	http.HandleFunc("/status", corsHandler(makeStatusHandler(smtcBackend)))
 	http.HandleFunc("/hold", corsHandler(handleHold))
@@ -190,4 +200,43 @@ func handleShutdown(w http.ResponseWriter, r *http.Request) {
 func handleIndex(w http.ResponseWriter, r *http.Request) {
 	baseDir := getBaseDir()
 	http.ServeFile(w, r, filepath.Join(baseDir, "web", "index.html"))
+}
+
+// handleLyrics 处理歌词获取请求的 HTTP 端点。
+// 参数通过查询字符串传递：title, artist, duration, appName
+// 返回 JSON 格式的歌词获取结果。
+// @param w HTTP 响应写入器
+// @param r HTTP 请求对象
+func handleLyrics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// 解析查询参数
+	title := r.URL.Query().Get("title")
+	artist := r.URL.Query().Get("artist")
+	duration := 0
+	if d := r.URL.Query().Get("duration"); d != "" {
+		fmt.Sscanf(d, "%d", &duration)
+	}
+	appName := r.URL.Query().Get("appName")
+
+	if title == "" && artist == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"found": false,
+			"error": "缺少必要参数 title 或 artist",
+		})
+		return
+	}
+
+	// 调用歌词获取器
+	result := lyrics.FetchLyrics(r.Context(), title, artist, duration, appName)
+
+	// 返回结果
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"found":  result.Found,
+		"lyrics": result.Lyrics,
+		"source": result.Source,
+		"cached": result.Cached,
+		"error":  result.Error,
+	})
 }

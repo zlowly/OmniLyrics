@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/omnilyrics/bridge/lyrics"
+	"github.com/omnilyrics/bridge/lyrics/sources"
 )
 
 // QQMusicSearchRequest 表示 QQ音乐搜索请求的数据结构。
@@ -217,7 +217,7 @@ func handleDecrypt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 执行解密
-	result, err := lyrics.DecryptQRC(req.Encrypted)
+	result, err := sources.DecryptQRC(req.Encrypted)
 	if err != nil {
 		log.Printf("[Decrypt] Decrypt failed: %v", err)
 		json.NewEncoder(w).Encode(DecryptResponse{Error: err.Error()})

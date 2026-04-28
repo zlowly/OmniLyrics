@@ -1,64 +1,13 @@
 // motion.js - 驱动层：逻辑运动引擎
-// 职责：心跳监测、多源竞态调度、状态计算
+// 简化版：直接调用后端 /lyrics 接口获取歌词
 
 // 从当前页面 URL 自动提取主机和端口，用于 API 调用
 const API_BASE = (() => {
     const loc = window.location;
     return `${loc.protocol}//${loc.host}`;
 })();
-const LRCLIB_API = 'https://lrclib.net/api/get';
 
-async function convertToTraditional(text) {
-    if (!text) return text;
-    try {
-        const res = await fetch(
-            `https://api.zhconvert.org/convert?text=${encodeURIComponent(text)}&converter=Traditional`
-        );
-        const json = await res.json();
-        return json?.data?.text || text;
-    } catch (e) {
-        console.warn('[Convert] Failed:', e);
-        return text;
-    }
-}
-
-async function searchLrclib(title, artist, currentDuration) {
-    const searchUrl = `${LRCLIB_API.replace('/get', '/search')}?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist || '')}`;
-    console.log('[Lrclib] Searching:', title, artist, 'duration:', currentDuration);
-    console.log('[Lrclib] URL:', searchUrl);
-    
-    const res = await fetch(searchUrl);
-    console.log('[Lrclib] Search response status:', res.status);
-    if (!res.ok) return null;
-    
-    const results = await res.json();
-    console.log('[Lrclib] Search results count:', results?.length);
-    if (!Array.isArray(results) || results.length === 0) return null;
-
-    const withDuration = results.filter(r => r.duration && r.duration > 0);
-    console.log('[Lrclib] Results with duration:', withDuration?.length);
-    const best = withDuration.length === 0
-        ? results[0]
-        : withDuration.sort((a, b) => Math.abs(a.duration - currentDuration) - Math.abs(b.duration - currentDuration))[0];
-    
-    console.log('[Lrclib] Best match:', best?.track_name, 'duration:', best?.duration);
-
-    const getUrl = `${LRCLIB_API.replace('/get', '/get')}/${best.id}`;
-    const getRes = await fetch(getUrl);
-    console.log('[Lrclib] Get response status:', getRes.status);
-    if (!getRes.ok) return null;
-    
-    const json = await getRes.json();
-    console.log('[Lrclib] Got lyrics, has synced:', !!json?.syncedLyrics, 'has plain:', !!json?.plainLyrics);
-    if (!json?.syncedLyrics && !json?.plainLyrics) return null;
-
-    const lyrics = json.syncedLyrics || json.plainLyrics;
-    return {
-        lrcData: parseLRCInternal(lyrics),
-        lyrics
-    };
-}
-
+// 解析 LRC 格式歌词为结构化数据
 function parseLRCInternal(lrcText) {
     if (!lrcText || typeof lrcText !== 'string') return [];
     lrcText = lrcText.replace(/^\uFEFF/, '');
@@ -84,21 +33,16 @@ function parseLRCInternal(lrcText) {
         const text = trimmed.substring(lineMatch[0].length);
 
         // 解析逐字时间戳：每个字前面都有 [mm:ss.xx]
-        // 格式：[00:00.000]汪[00:01.054]苏[00:02.108]泷
         const words = [];
         const wordRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]([^\[]+)/g;
         let match;
-
-        console.log('[LRC] Parsing line:', trimmed);
 
         while ((match = wordRegex.exec(trimmed)) !== null) {
             const wMin = parseInt(match[1]);
             const wSec = parseInt(match[2]);
             const wMs = match[3].length === 3 ? parseInt(match[3]) : parseInt(match[3]) * 10;
             const wordTimeMs = (wMin * 60 + wSec) * 1000 + wMs;
-            const wordText = match[4]; // 时间戳后面的文本
-
-            console.log('[LRC] Word match:', match[0], '-> time:', wordTimeMs, 'text:', wordText);
+            const wordText = match[4];
 
             // 逐字拆分（支持汉字和英文字符）
             for (const char of wordText) {
@@ -107,8 +51,6 @@ function parseLRCInternal(lrcText) {
                 }
             }
         }
-
-        console.log('[LRC] Words found:', words.length);
 
         // 如果有逐字时间戳（words 数量 > 1），使用逐字格式
         // 同时清理 text 中的时间戳，只保留纯文本
@@ -146,23 +88,6 @@ function cleanLRCInternal(lrc) {
     return cleaned;
 }
 
-const lyricsSources = window.lyricsSources || [];
-let scheduler = null;
-
-async function getScheduler() {
-    if (!scheduler) {
-        if (window.lyricsScheduler) {
-            // 使用 index.js 已初始化的调度器
-            scheduler = window.lyricsScheduler;
-        } else {
-            scheduler = new window.LyricsScheduler();
-            scheduler.init(window.lyricsSources || []);
-            console.log('[Motion] Scheduler initialized');
-        }
-    }
-    return scheduler;
-}
-
 class MotionEngine {
     constructor() {
         this.isConnected = false;
@@ -170,7 +95,7 @@ class MotionEngine {
         this.currentIndex = 0;
         this.lastPosition = 0;
         this.lastTitle = '';
-        this.songDuration = 0;  // 歌曲总时长
+        this.songDuration = 0;
         this.velocity = 0;
         this.frameData = {
             currentIndex: 0,
@@ -181,8 +106,12 @@ class MotionEngine {
         };
         this.onFrame = null;
         this.onConnectionChange = null;
+        this.onSongChange = null;
         this.online = navigator.onLine;
         this.fetchFailed = false;
+        this.fetchRetryCount = 0;
+        this.lastAppName = '';
+        this.lastStatus = 'Unknown';
         this.init();
     }
 
@@ -229,109 +158,101 @@ class MotionEngine {
         if (data.title !== this.lastTitle) {
             this.lastTitle = data.title;
             this.lrcData = [];
-            fetchRetryCount = 0;
+            this.fetchRetryCount = 0;
             this.fetchFailed = false;
             console.log('[Motion] New song:', data.title, 'duration:', duration);
 
             // 通知渲染器重置状态
             this.onSongChange?.();
 
-            // 新歌曲时检查本地缓存
-            await this.checkLocalCache(data.title, data.artist, duration);
+            // 新歌曲时调用后端 /lyrics 接口获取歌词
+            if (data.title) {
+                await this.fetchLyrics(data.title, data.artist, Math.floor(duration / 1000), this.lastAppName);
+            }
         }
 
         this.lastPosition = position;
     }
 
-async checkLocalCache(title, artist, duration) {
-        if (!title) return;
-        try {
-            const url = `${API_BASE}/check_cache?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist || '')}`;
-            const res = await fetch(url);
-            if (res.ok) {
-                const result = await res.json();
-                let lrcContent = typeof result.content === 'string' ? result.content : result.content?.value || '';
-                lrcContent = lrcContent.replace(/\\n/g, '\n').replace(/\\r/g, '');
-                if (result.found && lrcContent) {
-                    console.log('[Motion] Found local cache, parsing...');
-                    this.lrcData = parseLRCInternal(lrcContent);
-                    console.log('[Motion] Parsed lrcData length:', this.lrcData.length, this.lrcData.slice(0, 3));
-                    // 写入后端缓存（让后端记住有缓存）
-                    this.lastLrcContent = lrcContent;
-                } else if (this.online && !this.fetchFailed) {
-                    // 无本地缓存，获取在线歌词（duration单位从毫秒转为秒）
-                    await this.fetchOnlineLyrics(title, artist, Math.floor(duration / 1000));
-                }
-            }
-        } catch (e) {
-            console.warn('[Motion] checkLocalCache failed:', e);
-        }
-    }
-
-parseLRC(lrcText) {
-        return parseLRCInternal(lrcText);
-    }
-
-    cleanLRC(lrc) {
-        return cleanLRCInternal(lrc);
-    }
-
-    shouldFetchOnline(data) {
-        const local = this.lrcData.find(l => l.text.includes('[偏移:'));
-        const hasWordLevel = this.lrcData.some(l => /\[.*?\d+:\d+\.\d+\]/.test(JSON.stringify(l)));
-        return !local && hasWordLevel;
-    }
-
-    async fetchOnlineLyrics(title, artist, currentDuration) {
+    async fetchLyrics(title, artist, durationSec, appName) {
         if (!title || !this.online) return;
-        if (!currentDuration || currentDuration <= 0) {
+        if (!durationSec || durationSec <= 0) {
             console.warn('[Lyrics] No duration, skip search');
             return;
         }
-        if (fetchRetryCount >= MAX_RETRY) {
+        if (this.fetchRetryCount >= 3) {
             console.warn('[Lyrics] Max retries reached, giving up');
             this.fetchFailed = true;
             return;
         }
 
-        const appName = this.lastAppName || '';
-        const sched = await getScheduler();
+        try {
+            const url = `${API_BASE}/lyrics?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist || '')}&duration=${durationSec}&appName=${encodeURIComponent(appName || '')}`;
+            console.log('[Lyrics] Fetching from backend:', url);
 
-        let result = await sched.search(title, artist, currentDuration, appName);
+            const res = await fetch(url);
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
 
-        if (result) {
-            console.log('[Lyrics] Found:', title, artist);
-            this.lrcData = result.lrcData;
-            this.updateCache(title, artist, result.lyrics);
-            fetchRetryCount = 0;
-            return;
-        }
+            const result = await res.json();
+            console.log('[Lyrics] Backend response:', result);
 
-        const titleTw = await convertToTraditional(title);
-        const artistTw = await convertToTraditional(artist);
-        if (titleTw !== title || artistTw !== artist) {
-            result = await sched.search(titleTw, artistTw, currentDuration, appName);
-            if (result) {
-                console.log('[Lyrics] Found (converted):', titleTw, artistTw);
-                this.lrcData = result.lrcData;
-                this.updateCache(title, artist, result.lyrics);
-                fetchRetryCount = 0;
+            if (result.found && result.lyrics) {
+                console.log('[Lyrics] Found lyrics from', result.source, '(cached:', result.cached, ')');
+                this.lrcData = parseLRCInternal(result.lyrics);
+                console.log('[Motion] Parsed lrcData length:', this.lrcData.length);
+                this.fetchRetryCount = 0;
                 return;
             }
-        }
 
-        fetchRetryCount++;
-        console.warn(`[Lyrics] All sources failed (${fetchRetryCount}/${MAX_RETRY})`);
+            // 未找到歌词，尝试转换为繁体再搜索
+            const titleTw = await this.convertToTraditional(title);
+            const artistTw = await this.convertToTraditional(artist);
+            if (titleTw !== title || artistTw !== artist) {
+                const retryUrl = `${API_BASE}/lyrics?title=${encodeURIComponent(titleTw)}&artist=${encodeURIComponent(artistTw || '')}&duration=${durationSec}&appName=${encodeURIComponent(appName || '')}`;
+                console.log('[Lyrics] Retry with traditional Chinese:', retryUrl);
+
+                const retryRes = await fetch(retryUrl);
+                if (retryRes.ok) {
+                    const retryResult = await retryRes.json();
+                    if (retryResult.found && retryResult.lyrics) {
+                        console.log('[Lyrics] Found lyrics (traditional):', retryResult.source);
+                        this.lrcData = parseLRCInternal(retryResult.lyrics);
+                        this.fetchRetryCount = 0;
+                        return;
+                    }
+                }
+            }
+
+            this.fetchRetryCount++;
+            console.warn(`[Lyrics] Not found (${this.fetchRetryCount}/3)`);
+        } catch (e) {
+            console.warn('[Lyrics] Fetch failed:', e);
+            this.fetchRetryCount++;
+        }
     }
 
-    async updateCache(title, artist, lrc) {
+    async convertToTraditional(text) {
+        if (!text) return text;
         try {
-            await fetch(`${API_BASE}/update_cache`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, artist, lrc })
-            });
-        } catch (e) { /* fail silently */ }
+            const res = await fetch(
+                `https://api.zhconvert.org/convert?text=${encodeURIComponent(text)}&converter=Traditional`
+            );
+            const json = await res.json();
+            return json?.data?.text || text;
+        } catch (e) {
+            console.warn('[Convert] Failed:', e);
+            return text;
+        }
+    }
+
+    parseLRC(lrcText) {
+        return parseLRCInternal(lrcText);
+    }
+
+    cleanLRC(lrc) {
+        return cleanLRCInternal(lrc);
     }
 
     startRenderLoop() {
@@ -395,26 +316,6 @@ parseLRC(lrcText) {
     }
 }
 
-// 修复变量名冲突
+// 导出实例
 const motionEngine = new MotionEngine();
 window.motion = motionEngine;
-
-// 歌词 provider 定义
-class LrclibProvider {
-    name = 'lrclib';
-    async search(title, artist, duration) {
-        return searchLrclib(title, artist, duration);
-    }
-}
-
-// 注册到全局，LyricsScheduler 初始化时会读取
-// QQMusicProvider 来自 qqmusic.js（已在 index.html 中加载）
-const providers = [new LrclibProvider()];
-if (window.QQMusicProvider) {
-    providers.push(new window.QQMusicProvider());
-}
-window.lyricsSources = providers;
-
-// 重试计数
-let fetchRetryCount = 0;
-const MAX_RETRY = 3;
