@@ -469,8 +469,9 @@ type qqMusicSearchResponse struct {
 
 // songSearchResult 歌曲搜索结果。
 type songSearchResult struct {
-	SongID  int64  // 歌曲ID，用于获取歌词
-	SongMid string // 歌曲MID
+	SongID   int64  // 歌曲ID，用于获取歌词
+	SongMid  string // 歌曲MID
+	Duration int    // 歌曲时长（秒）
 }
 
 // Search 根据歌曲信息从 QQ音乐搜索歌词。
@@ -478,21 +479,35 @@ type songSearchResult struct {
 //   - ctx: 上下文，用于取消和超时控制
 //   - title: 歌曲标题
 //   - artist: 艺术家名称
-//   - duration: 歌曲时长（秒，QQ音乐源暂未使用此参数）
+//   - duration: 歌曲时长（秒，用于版本匹配）
 //
 // 返回：
 //   - lyrics: LRC 格式的歌词文本
 //   - err: 错误信息
 func (s *QQMusicSource) Search(ctx context.Context, title, artist string, duration int) (string, error) {
-	// 步骤1：搜索歌曲获取 songID 和 songMid
-	result := s.searchSong(ctx, title, artist)
+	// 步骤1：搜索歌曲获取候选列表（包含时长信息）
+	candidates := s.searchSongs(ctx, title, artist)
+	if candidates == nil || len(candidates) == 0 {
+		return "", nil // 未找到歌曲
+	}
+
+	// 步骤2：根据时长选择最匹配的版本
+	var result *songSearchResult
+	if duration > 0 {
+		result = selectBestMatch(candidates, duration)
+	} else {
+		// 保持向后兼容：如果没有提供时长，使用第一个结果
+		result = candidates[0]
+	}
+	
 	if result == nil {
 		return "", nil // 未找到歌曲
 	}
 
-	logger.Infof("[QQMusic] 找到歌曲: songID=%d, songMid=%s", result.SongID, result.SongMid)
+	logger.Infof("[QQMusic] 找到歌曲: songID=%d, songMid=%s, duration=%ds (目标: %ds)", 
+		result.SongID, result.SongMid, result.Duration, duration)
 
-	// 步骤2：获取加密歌词（使用新的API）
+	// 步骤3：获取加密歌词（使用新的API）
 	encrypted, err := s.getLyricsByID(ctx, result.SongID, title, artist, duration)
 	if err != nil {
 		return "", fmt.Errorf("获取歌词失败: %w", err)
@@ -501,20 +516,20 @@ func (s *QQMusicSource) Search(ctx context.Context, title, artist string, durati
 		return "", nil // 未找到歌词
 	}
 
-	// 步骤3：解密 QRC 格式歌词
+	// 步骤4：解密 QRC 格式歌词
 	lyricsText, err := DecryptQRC(encrypted)
 	if err != nil {
 		return "", fmt.Errorf("解密歌词失败: %w", err)
 	}
 
-	// 步骤4：将 QRC 格式转换为 LRC 格式
+	// 步骤5：将 QRC 格式转换为 LRC 格式
 	lrcText := qrc2lrc(lyricsText)
 
 	return lrcText, nil
 }
 
-// searchSong 搜索歌曲并返回 songID 和 songMid。
-func (s *QQMusicSource) searchSong(ctx context.Context, title, artist string) *songSearchResult {
+// searchSongs 搜索歌曲并返回候选列表，包含时长信息用于版本匹配。
+func (s *QQMusicSource) searchSongs(ctx context.Context, title, artist string) []*songSearchResult {
 	query := artist + " " + title
 
 	// 构造请求数据，使用 DoSearchForQQMusicLite 方法
@@ -606,37 +621,58 @@ func (s *QQMusicSource) searchSong(ctx context.Context, title, artist string) *s
 		return nil // 无搜索结果
 	}
 
-	firstSong, ok := songs[0].(map[string]interface{})
-	if !ok {
-		return nil
+	var results []*songSearchResult
+	// 限制处理前10个结果以提高效率
+	maxResults := 10
+	if len(songs) < maxResults {
+		maxResults = len(songs)
 	}
 
-	// 提取 songID 和 songMid（新API使用 id 和 mid）
-	var songID int64
-	var songMid string
+	for i := 0; i < maxResults; i++ {
+		song, ok := songs[i].(map[string]interface{})
+		if !ok {
+			continue
+		}
 
-	if id, ok := firstSong["id"]; ok {
-		switch v := id.(type) {
-		case float64:
-			songID = int64(v)
-		case int64:
-			songID = v
+		// 提取 songID、songMid 和 duration（新API使用 id、mid 和 interval）
+		var songID int64
+		var songMid string
+		var duration int // 歌曲时长（秒）
+
+		if id, ok := song["id"]; ok {
+			switch v := id.(type) {
+			case float64:
+				songID = int64(v)
+			case int64:
+				songID = v
+			}
+		}
+
+		if mid, ok := song["mid"].(string); ok {
+			songMid = mid
+		}
+
+		// 提取时长信息（interval字段，单位为秒）
+		if interval, ok := song["interval"]; ok {
+			switch v := interval.(type) {
+			case float64:
+				duration = int(v)
+			case int64:
+				duration = int(v)
+			}
+		}
+
+		// 只添加有效的歌曲结果
+		if songID != 0 && songMid != "" {
+			results = append(results, &songSearchResult{
+				SongID:   songID,
+				SongMid:  songMid,
+				Duration: duration,
+			})
 		}
 	}
 
-	if mid, ok := firstSong["mid"].(string); ok {
-		songMid = mid
-	}
-
-	if songID == 0 || songMid == "" {
-		logger.Debugf("[QQMusic] 无法提取 songID 或 songMid, 可用字段: %v", getMapKeys(firstSong))
-		return nil
-	}
-
-	return &songSearchResult{
-		SongID:  songID,
-		SongMid: songMid,
-	}
+	return results
 }
 
 // getMapKeys 获取 map 的所有键（用于调试）。
@@ -646,6 +682,52 @@ func getMapKeys(m map[string]interface{}) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// selectBestMatch 根据目标时长选择最匹配的歌曲版本
+// 如果目标时长 <= 0，返回第一个结果（保持原有行为）
+// 否则选择时长最接近的版本（允许±2秒的误差范围）
+func selectBestMatch(results []*songSearchResult, targetDuration int) *songSearchResult {
+	if len(results) == 0 {
+		return nil
+	}
+	
+	// 如果目标时长无效，返回第一个结果
+	if targetDuration <= 0 {
+		return results[0]
+	}
+	
+	// 查找时长最接近的结果
+	var bestMatch *songSearchResult
+	minDiff := int(^uint(0) >> 1) // 最大整数值
+	
+	for _, result := range results {
+		// 计算时长差的绝对值
+		diff := result.Duration - targetDuration
+		if diff < 0 {
+			diff = -diff
+		}
+		
+		// 更新最佳匹配
+		if diff < minDiff {
+			minDiff = diff
+			bestMatch = result
+			
+			// 如果完全匹配，直接返回
+			if diff == 0 {
+				break
+			}
+		}
+	}
+	
+	// 如果在容忍范围内（±2秒），返回最佳匹配
+	// 否则返回第一个结果（保持向后兼容）
+	if minDiff <= 2 {
+		return bestMatch
+	}
+	
+	// 超出容忍范围，返回第一个结果
+	return results[0]
 }
 
 // getLyricsByID 根据歌曲ID获取加密歌词（使用新API）。
