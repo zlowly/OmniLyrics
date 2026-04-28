@@ -6,19 +6,24 @@ import (
 	"path/filepath"
 )
 
-// SourceConfig 定义单个歌词源的配置。
-type SourceConfig struct {
-	Name     string   `json:"name"`     // 歌词源名称标识
-	Enabled  bool     `json:"enabled"`  // 是否启用该源
-	Priority int      `json:"priority"` // 优先级，数字越小优先级越高
-	Apps     []string `json:"apps"`     // 适用的播放器列表，"*" 表示通用
+// RuleSource 定义规则中单个歌词源的配置。
+type RuleSource struct {
+	Name     string `json:"name"`     // 歌词源名称标识
+	Enabled  bool   `json:"enabled"`  // 是否启用该源
+	Priority int    `json:"priority"` // 优先级，数字越小优先级越高
+}
+
+// MatchRule 定义一条匹配规则。
+type MatchRule struct {
+	AppName string       `json:"appName"` // 匹配的App名称，空表示兜底规则
+	Sources []RuleSource `json:"sources"` // 歌词源列表
 }
 
 // LyricsConfig 定义歌词源的整体配置。
 type LyricsConfig struct {
-	Timeout int             `json:"timeout"` // 单次搜索超时时间（毫秒）
-	Retry   int             `json:"retry"`   // 重试次数
-	Sources []SourceConfig  `json:"sources"` // 歌词源列表
+	Timeout int         `json:"timeout"` // 单次搜索超时时间（毫秒）
+	Retry   int         `json:"retry"`   // 重试次数
+	Rules   []MatchRule `json:"rules"`   // 匹配规则列表
 }
 
 // defaultConfig 返回默认歌词配置。
@@ -26,10 +31,15 @@ func defaultConfig() *LyricsConfig {
 	return &LyricsConfig{
 		Timeout: 5000,
 		Retry:   1,
-		Sources: []SourceConfig{
-			{Name: "lrclib", Enabled: true, Priority: 1, Apps: []string{"*"}},
-			{Name: "qqmusic", Enabled: true, Priority: 2, Apps: []string{"QQMusic.exe", "*"}},
-			{Name: "kgmusic", Enabled: true, Priority: 3, Apps: []string{"KuGou.exe", "*"}},
+		Rules: []MatchRule{
+			{
+				AppName: "",
+				Sources: []RuleSource{
+					{Name: "lrclib", Enabled: true, Priority: 1},
+					{Name: "qqmusic", Enabled: true, Priority: 2},
+					{Name: "kgmusic", Enabled: true, Priority: 3},
+				},
+			},
 		},
 	}
 }

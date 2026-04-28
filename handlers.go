@@ -446,9 +446,15 @@ func handleLyricsConfig(w http.ResponseWriter, r *http.Request, configDir string
 			defaultConfig := map[string]interface{}{
 				"timeout": 5000,
 				"retry":   1,
-				"sources": []map[string]interface{}{
-					{"name": "lrclib", "enabled": true, "priority": 1, "apps": []string{"*"}},
-					{"name": "qqmusic", "enabled": true, "priority": 2, "apps": []string{"QQMusic.exe", "*"}},
+				"rules": []map[string]interface{}{
+					{
+						"appName": "",
+						"sources": []map[string]interface{}{
+							{"name": "lrclib", "enabled": true, "priority": 1},
+							{"name": "qqmusic", "enabled": true, "priority": 2},
+							{"name": "kgmusic", "enabled": true, "priority": 3},
+						},
+					},
 				},
 			}
 			json.NewEncoder(w).Encode(defaultConfig)

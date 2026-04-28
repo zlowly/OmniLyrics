@@ -347,6 +347,156 @@
 
     /* 隐藏 */
     .hidden { display: none !important; }
+
+    /* 匹配规则列表 */
+    .rules-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .rule-item {
+      padding: 16px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+    .rule-item:hover {
+      border-color: var(--accent);
+    }
+    .rule-item.fallback {
+      border-left: 3px solid #888;
+    }
+    .rule-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .rule-title {
+      font-weight: bold;
+    }
+    .rule-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .rule-actions button {
+      padding: 4px 8px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      border-radius: 4px;
+      color: var(--fg);
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .rule-actions button:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .rule-actions button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+    .rule-info {
+      font-size: 0.9rem;
+      color: #aaa;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .rule-sources {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .source-tag {
+      padding: 2px 8px;
+      background: rgba(0,255,255,0.1);
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal {
+      background: var(--bg);
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-title {
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--fg);
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+    .modal-body {
+      padding: 20px;
+    }
+    .modal-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 12px;
+    }
+
+    /* 弹窗内歌词源配置 */
+    .source-config-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .source-config-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px;
+      background: rgba(0,0,0,0.2);
+      border-radius: 6px;
+    }
+    .source-config-item input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+    }
+    .source-config-name {
+      font-weight: bold;
+    }
+    .source-config-priority {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.9rem;
+    }
+    .source-config-priority input {
+      width: 60px;
+      padding: 6px 8px;
+    }
   </style>
 </head>
 <body>
@@ -366,15 +516,18 @@
     <div class="main-layout active" data-layout="lyrics">
       <div class="sidebar">
         <div class="sidebar-section-title">歌词源</div>
-        <div class="side-option active" data-panel="source-list">
-          <input type="radio" name="lyrics-panel" value="source-list" checked>
-          源列表
+        <div class="side-option active" data-panel="match-rules">
+          <input type="radio" name="lyrics-panel" value="match-rules" checked>
+          匹配规则
         </div>
       </div>
       <div class="content">
-        <div class="content-card active" data-panel="source-list">
+        <div class="content-card active" data-panel="match-rules">
           <div class="card">
-            <div class="card-title">歌词源配置</div>
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>匹配规则</span>
+              <button class="btn btn-primary" id="addRuleBtn" style="padding: 6px 16px; font-size: 0.9rem;">+ 新增规则</button>
+            </div>
             <div class="form-item" style="margin-bottom: 16px;">
               <label>请求超时 (毫秒)</label>
               <input type="number" id="lyrics-timeout" value="5000" min="1000" max="30000" step="500">
@@ -383,10 +536,39 @@
               <label>搜索失败重试次数</label>
               <input type="number" id="lyrics-retry" value="1" min="0" max="3">
             </div>
-            <div class="source-list" id="source-list">
+            <div class="rules-list" id="rules-list">
               <!-- 动态生成 -->
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 编辑规则弹窗 -->
+    <div class="modal-overlay" id="ruleModal">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title" id="modalTitle">编辑规则</span>
+          <button class="modal-close" id="modalClose">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-item">
+            <label>匹配的App名称</label>
+            <input type="text" id="ruleAppName" placeholder="输入App名称">
+            <small style="color: #888; font-size: 0.8rem;">留空表示其它所有app并作为最末尾规则</small>
+          </div>
+          <div class="form-item" style="margin-top: 16px;">
+            <label>歌词源配置</label>
+            <div class="source-config-list" id="sourceConfigList">
+              <!-- 动态生成 -->
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="deleteRuleBtn" style="background: var(--danger);">删除规则</button>
+          <div style="flex: 1;"></div>
+          <button class="btn btn-secondary" id="cancelRuleBtn">取消</button>
+          <button class="btn btn-primary" id="saveRuleBtn">确认</button>
         </div>
       </div>
     </div>
@@ -729,15 +911,22 @@
 
   <script src="scripts/config.js"></script>
   <script>
-    const LYRICS_DEFAULT = {
+const LYRICS_DEFAULT = {
       timeout: 5000,
       retry: 1,
-      sources: [
-        { name: 'lrclib', enabled: true, priority: 1, apps: ['*'] },
-        { name: 'qqmusic', enabled: true, priority: 2, apps: ['QQMusic.exe', '*'] }
-        ,{ name: 'kgmusic', enabled: true, priority: 3, apps: ['kugou*'] }
+      rules: [
+        {
+          appName: '',
+          sources: [
+            { name: 'lrclib', enabled: true, priority: 1 },
+            { name: 'qqmusic', enabled: true, priority: 2 },
+            { name: 'kgmusic', enabled: true, priority: 3 }
+          ]
+        }
       ]
     };
+
+    const ALL_SOURCES = ['lrclib', 'qqmusic', 'kgmusic'];
 
     const RENDERER_DEFAULT = {
       mode: 'karaoke',
@@ -796,7 +985,7 @@
        // 歌词源配置
        document.getElementById('lyrics-timeout').value = lyricsConfig.timeout ?? 5000;
        document.getElementById('lyrics-retry').value = lyricsConfig.retry ?? 1;
-       renderSourceList(lyricsConfig.sources || []);
+       renderRulesList(lyricsConfig.rules || []);
 
 // 渲染配置
         const currentMode = rendererConfig.mode || 'karaoke';
@@ -943,38 +1132,219 @@ const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.
       }
     }
 
-    function renderSourceList(sources) {
-      const container = document.getElementById('source-list');
+function renderRulesList(rules) {
+      const container = document.getElementById('rules-list');
+      if (!rules || rules.length === 0) {
+        container.innerHTML = '<p style="color: #888; text-align: center;">暂无规则，点击"新增规则"添加</p>';
+        return;
+      }
+
+      // 找到兜底规则的索引
+      let fallbackIndex = -1;
+      rules.forEach((rule, i) => {
+        if (rule.appName === '') fallbackIndex = i;
+      });
+
+      container.innerHTML = rules.map((rule, i) => {
+        const isFallback = rule.appName === '';
+        const enabledSources = rule.sources ? rule.sources.filter(s => s.enabled) : [];
+        const sourceTags = enabledSources.map(s => `${s.name}:${s.priority}`).join(', ');
+
+        const moveButtons = isFallback ? '' : `
+          <button class="move-up" data-index="${i}" ${i === 0 ? 'disabled' : ''}>▲</button>
+          <button class="move-down" data-index="${i}" ${(fallbackIndex !== -1 && i === fallbackIndex - 1) ? 'disabled' : ''}>▼</button>
+        `;
+
+        return `
+          <div class="rule-item ${isFallback ? 'fallback' : ''}" data-index="${i}">
+            <div class="rule-header">
+              <span class="rule-title">${isFallback ? 'App: 其它所有' : `App: ${rule.appName}`}</span>
+              <div class="rule-actions">
+                ${moveButtons}
+                <button class="delete-rule" data-index="${i}">删除</button>
+              </div>
+            </div>
+            <div class="rule-info">
+              <span class="rule-sources">
+                ${sourceTags ? sourceTags.split(',').map(t => `<span class="source-tag">${t.trim()}</span>`).join('') : '无启用源'}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 确保兜底规则永远在最底部
+    function normalizeRules() {
+      const rules = lyricsConfig.rules;
+      if (!rules) return;
+      const nonFallback = rules.filter(r => r.appName !== '');
+      const fallback = rules.filter(r => r.appName === '');
+      lyricsConfig.rules = [...nonFallback, ...fallback];
+    }
+
+    function collectLyricsConfig() {
+      // 从 lyricsConfig 直接收集（因为规则是通过 Modal 编辑的）
+      return {
+        timeout: parseInt(document.getElementById('lyrics-timeout').value),
+        retry: parseInt(document.getElementById('lyrics-retry').value),
+        rules: lyricsConfig.rules
+      };
+    }
+
+    // Modal 相关变量
+    let currentRuleIndex = -1;
+    let isNewRule = false;
+
+    // 打开弹窗
+    function openRuleModal(index, isNew = false) {
+      currentRuleIndex = index;
+      isNewRule = isNew;
+      const modal = document.getElementById('ruleModal');
+      const title = document.getElementById('modalTitle');
+
+      if (isNew) {
+        title.textContent = '新增规则';
+        document.getElementById('ruleAppName').value = '';
+        // 默认启用所有源，优先级从1开始
+        const defaultSources = ALL_SOURCES.map((name, i) => ({
+          name,
+          enabled: true,
+          priority: i + 1
+        }));
+        renderSourceConfigList(defaultSources);
+      } else {
+        const rule = lyricsConfig.rules[index];
+        title.textContent = rule.appName === '' ? '编辑规则 - App: 其它所有' : `编辑规则 - App: ${rule.appName}`;
+        document.getElementById('ruleAppName').value = rule.appName || '';
+        renderSourceConfigList(rule.sources || []);
+      }
+
+      modal.classList.add('active');
+    }
+
+    // 渲染弹窗内的歌词源配置
+    function renderSourceConfigList(sources) {
+      const container = document.getElementById('sourceConfigList');
       container.innerHTML = sources.map((s, i) => `
-        <div class="source-item">
-          <label class="switch">
-            <input type="checkbox" class="source-enabled" data-index="${i}" ${s.enabled ? 'checked' : ''}>
-            <span class="switch-slider"></span>
-          </label>
-          <span class="source-name">${s.name}</span>
-          <input type="number" class="source-priority" data-index="${i}" value="${s.priority}" min="1" max="10">
-          <input type="text" class="source-apps" data-index="${i}" value="${(s.apps || []).join(', ')}" placeholder="适用App，如 *">
+        <div class="source-config-item">
+          <input type="checkbox" class="source-enabled" data-index="${i}" ${s.enabled ? 'checked' : ''}>
+          <span class="source-config-name">${s.name}</span>
+          <div class="source-config-priority">
+            优先级: <input type="number" class="source-priority" data-index="${i}" value="${s.priority}" min="1" max="100">
+          </div>
         </div>
       `).join('');
     }
 
-    function collectLyricsConfig() {
+    // 关闭弹窗
+    function closeRuleModal() {
+      document.getElementById('ruleModal').classList.remove('active');
+      currentRuleIndex = -1;
+      isNewRule = false;
+    }
+
+    // 保存规则
+    function saveRule() {
+      const appName = document.getElementById('ruleAppName').value.trim();
+
+      // 不允许输入"其它所有"
+      if (appName === '其它所有' || appName === '其它所有app') {
+        alert('不允许输入"其它所有"，请留空表示兜底规则');
+        return;
+      }
+
+      // 收集源配置
       const sources = [];
-      document.querySelectorAll('.source-item').forEach((item, i) => {
+      document.querySelectorAll('.source-config-item').forEach((item, i) => {
         const enabled = item.querySelector('.source-enabled').checked;
         const priority = parseInt(item.querySelector('.source-priority').value);
-        const apps = item.querySelector('.source-apps').value.split(',').map(a => a.trim()).filter(a => a);
-        // 动态获取源名称，适应将来新增的歌词源
-        const nameEl = item.querySelector('.source-name');
-        const name = nameEl ? nameEl.textContent.trim() : '';
-        sources.push({ name, enabled, priority, apps });
+        const name = item.querySelector('.source-config-name').textContent;
+        sources.push({ name, enabled, priority });
       });
-      return {
-        timeout: parseInt(document.getElementById('lyrics-timeout').value),
-        retry: parseInt(document.getElementById('lyrics-retry').value),
-        sources
-      };
+
+      // 校验兜底规则
+      if (appName === '') {
+        // 检查是否已存在其他兜底规则
+        const existingFallbackIndex = lyricsConfig.rules.findIndex((r, i) => r.appName === '' && i !== currentRuleIndex);
+        if (existingFallbackIndex !== -1) {
+          alert('已有兜底规则，不可重复创建');
+          return;
+        }
+      }
+
+      const newRule = { appName, sources };
+
+      if (isNewRule) {
+        lyricsConfig.rules.push(newRule);
+      } else {
+        lyricsConfig.rules[currentRuleIndex] = newRule;
+      }
+
+      // 确保兜底规则在最底部
+      normalizeRules();
+      renderRulesList(lyricsConfig.rules);
+      closeRuleModal();
     }
+
+    // 删除规则
+    function deleteRule() {
+      if (currentRuleIndex < 0) return;
+      if (!confirm('确定要删除这条规则吗？')) return;
+
+      lyricsConfig.rules.splice(currentRuleIndex, 1);
+      renderRulesList(lyricsConfig.rules);
+      closeRuleModal();
+    }
+
+    // 移动规则
+    function moveRule(fromIndex, direction) {
+      const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1;
+      if (toIndex < 0 || toIndex >= lyricsConfig.rules.length) return;
+
+      // 交换
+      const temp = lyricsConfig.rules[fromIndex];
+      lyricsConfig.rules[fromIndex] = lyricsConfig.rules[toIndex];
+      lyricsConfig.rules[toIndex] = temp;
+
+      // 确保兜底规则在最底部
+      normalizeRules();
+      renderRulesList(lyricsConfig.rules);
+    }
+
+    // 绑定事件
+    document.getElementById('addRuleBtn').addEventListener('click', () => {
+      // 新增规则直接打开弹窗
+      openRuleModal(-1, true);
+    });
+
+    document.getElementById('rules-list').addEventListener('click', (e) => {
+      const target = e.target;
+      const ruleItem = target.closest('.rule-item');
+      if (!ruleItem) return;
+
+      const index = parseInt(ruleItem.dataset.index);
+
+      if (target.classList.contains('move-up')) {
+        moveRule(index, 'up');
+      } else if (target.classList.contains('move-down')) {
+        moveRule(index, 'down');
+      } else if (target.classList.contains('delete-rule')) {
+        if (confirm('确定要删除这条规则吗？')) {
+          lyricsConfig.rules.splice(index, 1);
+          normalizeRules();
+          renderRulesList(lyricsConfig.rules);
+        }
+      } else {
+        // 点击规则卡片打开编辑
+        openRuleModal(index, false);
+      }
+    });
+
+    document.getElementById('modalClose').addEventListener('click', closeRuleModal);
+    document.getElementById('cancelRuleBtn').addEventListener('click', closeRuleModal);
+    document.getElementById('saveRuleBtn').addEventListener('click', saveRule);
+    document.getElementById('deleteRuleBtn').addEventListener('click', deleteRule);
 
     function collectRendererConfig() {
       const latinFont = document.getElementById('fontFamilyLatin').value;

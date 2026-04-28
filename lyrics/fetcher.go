@@ -11,9 +11,8 @@ import (
 
 // Fetcher 是歌词获取器，负责协调缓存检查和多源搜索。
 type Fetcher struct {
-	cacheDir  string          // 缓存目录路径
-	config    *LyricsConfig   // 歌词源配置
-	sources   []sources.LyricsSource // 已注册的歌词源
+	cacheDir string        // 缓存目录路径
+	config   *LyricsConfig // 歌词源配置
 }
 
 // NewFetcher 创建新的歌词获取器实例。
@@ -24,35 +23,17 @@ type Fetcher struct {
 // 返回：
 //   - *Fetcher: 歌词获取器实例
 func NewFetcher(cacheDir string, cfg *LyricsConfig) *Fetcher {
-	f := &Fetcher{
+	return &Fetcher{
 		cacheDir: cacheDir,
 		config:   cfg,
-		sources:   []sources.LyricsSource{},
 	}
-
-	// 根据配置注册启用的歌词源
-	f.registerSources()
-
-	return f
 }
 
-// registerSources 根据配置注册启用的歌词源。
-func (f *Fetcher) registerSources() {
-	sourceMap := map[string]func() sources.LyricsSource{
-		"lrclib":  func() sources.LyricsSource { return sources.NewLRCLibSource() },
-		"qqmusic": func() sources.LyricsSource { return sources.NewQQMusicSource() },
-		"kgmusic": func() sources.LyricsSource { return sources.NewKGMusicSource() },
-	}
-
-	for _, srcConfig := range f.config.Sources {
-		if !srcConfig.Enabled {
-			continue
-		}
-		if factory, ok := sourceMap[srcConfig.Name]; ok {
-			f.sources = append(f.sources, factory())
-			logger.Infof("[Lyrics] 注册歌词源: %s (优先级: %d)", srcConfig.Name, srcConfig.Priority)
-		}
-	}
+// sourceFactories 定义歌词源工厂函数映射。
+var sourceFactories = map[string]func() sources.LyricsSource{
+	"lrclib":  func() sources.LyricsSource { return sources.NewLRCLibSource() },
+	"qqmusic": func() sources.LyricsSource { return sources.NewQQMusicSource() },
+	"kgmusic": func() sources.LyricsSource { return sources.NewKGMusicSource() },
 }
 
 // FetchRequest 定义歌词获取请求。
@@ -143,64 +124,52 @@ func (f *Fetcher) Fetch(ctx context.Context, req *FetchRequest) *FetchResult {
 }
 
 // filterSourcesByApp 根据播放器名称过滤和排序歌词源。
-// 优先返回匹配指定 appName 的源，然后是通用源（*）。
+// 根据匹配规则返回对应歌词源，并按优先级排序。
 func (f *Fetcher) filterSourcesByApp(appName string) []sources.LyricsSource {
 	type scoredSource struct {
 		source sources.LyricsSource
 		score  int // 分数越低优先级越高
 	}
 
-	var scored []scoredSource
-
-	for _, src := range f.sources {
-		// 查找该源的配置
-		var srcConfig *SourceConfig
-		for _, cfg := range f.config.Sources {
-			if cfg.Name == src.Name() {
-				srcConfig = &cfg
-				break
+	// 查找匹配的规则：优先精确匹配 AppName，否则找兜底规则
+	var matchedRule *MatchRule
+	for i := range f.config.Rules {
+		rule := &f.config.Rules[i]
+		if rule.AppName == "" {
+			// 兜底规则（AppName为空），只在使用其他规则都不匹配时采用
+			if matchedRule == nil {
+				matchedRule = rule
 			}
+		} else if appName != "" && rule.AppName == appName {
+			// 精确匹配
+			matchedRule = rule
+			break
 		}
-
-		if srcConfig == nil {
-			continue
-		}
-
-		score := srcConfig.Priority * 1000 // 基础优先级
-
-		// 检查是否匹配 appName
-		matched := false
-		hasWildcard := false
-		for _, app := range srcConfig.Apps {
-			if app == "*" {
-				hasWildcard = true
-			}
-			if app == appName {
-				matched = true
-				break
-			}
-		}
-
-		// 如果指定了 appName，只保留精确匹配的源
-		if appName != "" {
-			if !matched {
-				continue
-			}
-		} else {
-			// 未指定 appName 时，保留匹配或有通配符的源
-			if !matched && !hasWildcard {
-				continue
-			}
-		}
-
-		if matched {
-			score -= 500 // 匹配 appName 的源优先级更高
-		}
-
-		scored = append(scored, scoredSource{source: src, score: score})
 	}
 
-	// 按分数排序（低分优先）
+	if matchedRule == nil {
+		logger.Infof("[Lyrics] 无匹配规则，使用默认配置")
+		return nil
+	}
+
+	logger.Infof("[Lyrics] 使用匹配规则: appName=%s", matchedRule.AppName)
+
+	// 收集启用的源并按优先级排序
+	var scored []scoredSource
+	for _, srcConfig := range matchedRule.Sources {
+		if !srcConfig.Enabled {
+			continue
+		}
+		if factory, ok := sourceFactories[srcConfig.Name]; ok {
+			scored = append(scored, scoredSource{
+				source: factory(),
+				score:  srcConfig.Priority,
+			})
+			logger.Infof("[Lyrics] 启用歌词源: %s (优先级: %d)", srcConfig.Name, srcConfig.Priority)
+		}
+	}
+
+	// 按分数排序（低分优先），相同分数保持原始顺序（并行）
 	for i := 0; i < len(scored)-1; i++ {
 		for j := i + 1; j < len(scored); j++ {
 			if scored[j].score < scored[i].score {
