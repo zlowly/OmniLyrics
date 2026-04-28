@@ -5,8 +5,8 @@
 package main
 
 import (
-	"compress/zlib"
 	"bytes"
+	"compress/zlib"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -14,6 +14,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -79,7 +81,7 @@ const (
 )
 
 func bitNum(a []byte, b int, c int) int {
-	return int((a[(b/32)*4+3-(b%32)/8] >> (7 - b%8)) & 1) << c
+	return int((a[(b/32)*4+3-(b%32)/8]>>(7-b%8))&1) << c
 }
 
 func bitNumIntr(a int, b int, c int) int {
@@ -396,13 +398,18 @@ func qrcDecrypt(encryptedQrc string) (string, error) {
 	}
 	defer zlibReader.Close()
 
-	output := make([]byte, 4096)
-	n, err := zlibReader.Read(output)
-	if err != nil && err.Error() != "EOF" {
+	output, err := ioutil.ReadAll(zlibReader)
+	if err != nil {
 		return "", err
 	}
+	return string(output), nil
+	//	output := make([]byte, 4096)
+	//	n, err := zlibReader.Read(output)
+	//	if err != nil && err.Error() != "EOF" {
+	//		return "", err
+	//	}
 
-	return string(output[:n]), nil
+	// return string(output[:n]), nil
 }
 
 // ==================== QQ音乐客户端 ====================
@@ -429,15 +436,15 @@ func newQMCloud() *QMCloud {
 	return &QMCloud{
 		client: &http.Client{Timeout: 8 * time.Second},
 		comm: map[string]interface{}{
-			"ct":       11,
-			"cv":       "1003006",
-			"v":        "1003006",
+			"ct":        11,
+			"cv":        "1003006",
+			"v":         "1003006",
 			"os_ver":    "15",
 			"phonetype": "24122RKC7C",
-			"rom":      "Redmi/miro/miro:15/AE3A.240806.005/OS2.0.10X",
-			"tmeAppID": "qqmusiclight",
-			"nettype":  "NETWORK_WIFI",
-			"udid":    "0",
+			"rom":       "Redmi/miro/miro:15/AE3A.240806.005/OS2.0.10X",
+			"tmeAppID":  "qqmusiclight",
+			"nettype":   "NETWORK_WIFI",
+			"udid":      "0",
 		},
 	}
 }
@@ -532,21 +539,21 @@ func (q *QMCloud) GetLyricsForSong(info SongInfo) (string, error) {
 	interval := int(info.Duration / 1000)
 	param := map[string]interface{}{
 		"albumName":  albumName,
-		"crypt":     1,
-		"ct":        19,
-		"cv":        2111,
-		"interval":  interval,
-		"lrc_t":     0,
-		"qrc":       1,
-		"qrc_t":     0,
-		"roma":      1,
-		"roma_t":    0,
+		"crypt":      1,
+		"ct":         19,
+		"cv":         2111,
+		"interval":   interval,
+		"lrc_t":      0,
+		"qrc":        1,
+		"qrc_t":      0,
+		"roma":       1,
+		"roma_t":     0,
 		"singerName": singerName,
-		"songID":    int64(info.ID),
-		"songName":  songName,
-		"trans":     1,
-		"trans_t":   0,
-		"type":      0,
+		"songID":     int64(info.ID),
+		"songName":   songName,
+		"trans":      1,
+		"trans_t":    0,
+		"type":       0,
 	}
 	resp, err := q.request("GetPlayLyricInfo", "music.musichallSong.PlayLyricInfo", param)
 	if err != nil {
@@ -584,6 +591,82 @@ func decryptLyricIfPossible(s string) string {
 	return result
 }
 
+// qrc2lrc 将 QRC 格式歌词转换为逐字 LRC 格式。
+// QRC 格式：XML 结构，歌词内容在 LyricContent 属性中，格式为 [行起始ms,行持续ms]字(偏移,持续)...
+// 返回：逐字 LRC 格式，每个字都有时间戳，如 [00:00.00]晴[00:00.16]天
+func qrc2lrc(qrcXML string) string {
+	// 提取 LyricContent 内容 - 找到开始和结束位置
+	startMarker := `LyricContent="`
+	endMarker := `"/>`
+
+	startIdx := strings.Index(qrcXML, startMarker)
+	if startIdx < 0 {
+		return qrcXML // 不是QRC格式
+	}
+
+	startIdx += len(startMarker)
+	endIdx := strings.Index(qrcXML[startIdx:], endMarker)
+	if endIdx < 0 {
+		return qrcXML
+	}
+
+	content := qrcXML[startIdx : startIdx+endIdx]
+	lines := strings.Split(content, "\n")
+
+	// 行匹配正则：^\[行起始时间,行持续时间\]行内容$
+	lineRe := regexp.MustCompile(`^\[(\d+),(\d+)\](.*)$`)
+	// 逐字匹配正则：内容(起始偏移,持续时间)
+	wordRe := regexp.MustCompile(`([^\(]*)\((\d+),(\d+)\)`)
+
+	var result strings.Builder
+
+	for _, rawLine := range lines {
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			continue
+		}
+
+		lineMatch := lineRe.FindStringSubmatch(line)
+		if lineMatch == nil {
+			// 如果不是歌词行（如标签行），跳过
+			continue
+		}
+
+		lineStart, _ := strconv.Atoi(lineMatch[1])
+		lineContent := lineMatch[3]
+
+		// 匹配所有逐字时间戳
+		wordMatches := wordRe.FindAllStringSubmatch(lineContent, -1)
+		if wordMatches == nil {
+			// 如果没有逐字时间戳，使用行起始时间
+			result.WriteString(fmt.Sprintf("[%s]%s\n", msToTimeStr(lineStart), lineContent))
+			continue
+		}
+
+		// 生成逐字 LRC
+		for _, wm := range wordMatches {
+			wordContent := wm[1]
+			wordOffset, _ := strconv.Atoi(wm[2])
+			// wordDuration, _ := strconv.Atoi(wm[3]) // 暂时不用
+
+			absTime := lineStart + wordOffset
+			result.WriteString(fmt.Sprintf("[%s]%s", msToTimeStr(absTime), wordContent))
+		}
+		result.WriteString("\n")
+	}
+
+	return result.String()
+}
+
+// msToTimeStr 将毫秒转换为 LRC 时间格式 [mm:ss.xx]
+func msToTimeStr(ms int) string {
+	totalMs := ms
+	minutes := totalMs / 60000
+	seconds := (totalMs % 60000) / 1000
+	centiseconds := (totalMs % 1000) / 10
+	return fmt.Sprintf("%02d:%02d.%02d", minutes, seconds, centiseconds)
+}
+
 func searchSongs(client *http.Client, comm map[string]interface{}, artist, title string) ([]SongInfo, error) {
 	q := strings.TrimSpace(artist + " " + title)
 	if q == "" {
@@ -595,15 +678,15 @@ func searchSongs(client *http.Client, comm map[string]interface{}, artist, title
 			"method": "DoSearchForQQMusicLite",
 			"module": "music.search.SearchCgiService",
 			"param": map[string]interface{}{
-				"remoteplace":   "search.android.keyboard",
-				"query":       q,
-				"search_type": 0,
+				"remoteplace":  "search.android.keyboard",
+				"query":        q,
+				"search_type":  0,
 				"num_per_page": 20,
-				"page_num":   1,
-				"highlight":  0,
-				"nqc_flag":   0,
-				"page_id":    1,
-				"grp":       1,
+				"page_num":     1,
+				"highlight":    0,
+				"nqc_flag":     0,
+				"page_id":      1,
+				"grp":          1,
 			},
 		},
 	}
@@ -721,6 +804,9 @@ func main() {
 		log.Fatalf("获取歌词失败: %v", err)
 	}
 
-	fmt.Println("\n歌词内容:")
-	fmt.Println(lyric)
+	// 转换为逐字 LRC 格式
+	lrcLyric := qrc2lrc(lyric)
+
+	fmt.Println("\nLRC 歌词内容:")
+	fmt.Println(lrcLyric)
 }

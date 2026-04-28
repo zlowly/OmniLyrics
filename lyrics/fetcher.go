@@ -181,10 +181,20 @@ func (f *Fetcher) filterSourcesByApp(appName string) []sources.LyricsSource {
 			}
 		}
 
+		// 如果指定了 appName，只保留精确匹配的源
+		if appName != "" {
+			if !matched {
+				continue
+			}
+		} else {
+			// 未指定 appName 时，保留匹配或有通配符的源
+			if !matched && !hasWildcard {
+				continue
+			}
+		}
+
 		if matched {
 			score -= 500 // 匹配 appName 的源优先级更高
-		} else if !hasWildcard {
-			continue // 不匹配且没有通配符，跳过
 		}
 
 		scored = append(scored, scoredSource{source: src, score: score})
