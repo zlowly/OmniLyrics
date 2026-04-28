@@ -1,4 +1,4 @@
-module github.com/omnilyrics/bridge
+module github.com/zlowly/OmniLyrics
 
 go 1.24.0
 

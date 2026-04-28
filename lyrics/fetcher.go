@@ -3,10 +3,10 @@ package lyrics
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
-	"github.com/omnilyrics/bridge/lyrics/sources"
+	"github.com/zlowly/OmniLyrics/logger"
+	"github.com/zlowly/OmniLyrics/lyrics/sources"
 )
 
 // Fetcher 是歌词获取器，负责协调缓存检查和多源搜索。
@@ -50,7 +50,7 @@ func (f *Fetcher) registerSources() {
 		}
 		if factory, ok := sourceMap[srcConfig.Name]; ok {
 			f.sources = append(f.sources, factory())
-			log.Printf("[Lyrics] 注册歌词源: %s (优先级: %d)", srcConfig.Name, srcConfig.Priority)
+			logger.Infof("[Lyrics] 注册歌词源: %s (优先级: %d)", srcConfig.Name, srcConfig.Priority)
 		}
 	}
 }
@@ -80,12 +80,12 @@ type FetchResult struct {
 // 返回：
 //   - *FetchResult: 获取结果
 func (f *Fetcher) Fetch(ctx context.Context, req *FetchRequest) *FetchResult {
-	log.Printf("[Lyrics] 获取歌词: title=%s, artist=%s, appName=%s",
+	logger.Infof("[Lyrics] 获取歌词: title=%s, artist=%s, appName=%s",
 		req.Title, req.Artist, req.AppName)
 
 	// 步骤1：检查缓存
 	if found, content, err := CheckCache(f.cacheDir, req.Title, req.Artist); err == nil && found {
-		log.Printf("[Lyrics] 缓存命中")
+		logger.Infof("[Lyrics] 缓存命中")
 		return &FetchResult{
 			Found:  true,
 			Lyrics: content,
@@ -97,7 +97,7 @@ func (f *Fetcher) Fetch(ctx context.Context, req *FetchRequest) *FetchResult {
 	// 步骤2：根据 appName 过滤和排序歌词源
 	sources := f.filterSourcesByApp(req.AppName)
 	if len(sources) == 0 {
-		log.Printf("[Lyrics] 没有可用的歌词源")
+		logger.Warnf("[Lyrics] 没有可用的歌词源")
 		return &FetchResult{
 			Found: false,
 			Error: "没有可用的歌词源",
@@ -106,7 +106,7 @@ func (f *Fetcher) Fetch(ctx context.Context, req *FetchRequest) *FetchResult {
 
 	// 步骤3：按优先级搜索歌词
 	for _, src := range sources {
-		log.Printf("[Lyrics] 尝试从 %s 搜索...", src.Name())
+		logger.Infof("[Lyrics] 尝试从 %s 搜索...", src.Name())
 
 		// 为每个源设置超时
 		srcCtx, cancel := context.WithTimeout(ctx, time.Duration(f.config.Timeout)*time.Millisecond)
@@ -114,16 +114,16 @@ func (f *Fetcher) Fetch(ctx context.Context, req *FetchRequest) *FetchResult {
 
 		lyrics, err := src.Search(srcCtx, req.Title, req.Artist, req.Duration)
 		if err != nil {
-			log.Printf("[Lyrics] %s 搜索失败: %v", src.Name(), err)
+			logger.Warnf("[Lyrics] %s 搜索失败: %v", src.Name(), err)
 			continue
 		}
 
 		if lyrics != "" {
-			log.Printf("[Lyrics] %s 找到歌词", src.Name())
+			logger.Infof("[Lyrics] %s 找到歌词", src.Name())
 
 			// 保存到缓存
 			if err := UpdateCache(f.cacheDir, req.Title, req.Artist, lyrics); err != nil {
-				log.Printf("[Lyrics] 缓存保存失败: %v", err)
+				logger.Warnf("[Lyrics] 缓存保存失败: %v", err)
 			}
 
 			return &FetchResult{
@@ -135,7 +135,7 @@ func (f *Fetcher) Fetch(ctx context.Context, req *FetchRequest) *FetchResult {
 		}
 	}
 
-	log.Printf("[Lyrics] 所有歌词源均未找到")
+	logger.Warnf("[Lyrics] 所有歌词源均未找到")
 	return &FetchResult{
 		Found: false,
 		Error: "未找到歌词",
@@ -233,7 +233,7 @@ var (
 func InitFetcher(cacheDir, configDir string) error {
 	globalCacheDir = cacheDir
 	globalConfigDir = configDir
-	log.Printf("[Lyrics] 歌词获取器配置完成（每次请求将重新加载配置）")
+	logger.Infof("[Lyrics] 歌词获取器配置完成（每次请求将重新加载配置）")
 	return nil
 }
 

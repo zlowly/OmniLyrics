@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/zlowly/OmniLyrics/logger"
 )
 
 // LRCLibSource 实现 LRCLib 歌词源。
@@ -64,7 +65,7 @@ func (s *LRCLibSource) Search(ctx context.Context, title, artist string, duratio
 	}
 
 	apiURL := "https://lrclib.net/api/get?" + params.Encode()
-	log.Printf("[LRCLib] 搜索请求: %s", apiURL)
+	logger.Debugf("[LRCLib] 搜索请求: %s", apiURL)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {

@@ -1,11 +1,12 @@
 package lyrics
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/zlowly/OmniLyrics/logger"
 )
 
 // sanitizeFilename 将文件名中的非法字符替换为下划线。
@@ -47,7 +48,7 @@ func CheckCache(cacheDir, title, artist string) (found bool, content string, err
 	if _, err := os.Stat(filePath); err == nil {
 		data, err := os.ReadFile(filePath)
 		if err != nil {
-			log.Printf("[Lyrics] 读取缓存文件失败: %v", err)
+			logger.Warnf("[Lyrics] 读取缓存文件失败: %v", err)
 			return false, "", err
 		}
 		return true, string(data), nil
@@ -75,10 +76,10 @@ func UpdateCache(cacheDir, title, artist, lrc string) error {
 	filePath := filepath.Join(cacheDir, safeName+".lrc")
 
 	if err := os.WriteFile(filePath, []byte(lrc), 0644); err != nil {
-		log.Printf("[Lyrics] 写入缓存文件失败: %v", err)
+		logger.Warnf("[Lyrics] 写入缓存文件失败: %v", err)
 		return err
 	}
 
-	log.Printf("[Lyrics] 缓存已更新: %s", filePath)
+	logger.Infof("[Lyrics] 缓存已更新: %s", filePath)
 	return nil
 }

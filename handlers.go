@@ -3,15 +3,15 @@ package main
 import (
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
-	"github.com/omnilyrics/bridge/fonts"
-	"github.com/omnilyrics/bridge/smtc"
+	"github.com/zlowly/OmniLyrics/fonts"
+	"github.com/zlowly/OmniLyrics/logger"
+	"github.com/zlowly/OmniLyrics/smtc"
 )
 
 // holdFrozen 标记是否冻结状态（暂停获取新数据）
@@ -164,7 +164,7 @@ func handleCheckCache(w http.ResponseWriter, r *http.Request, cacheDir string) {
 	if _, err := os.Stat(filePath); err == nil {
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			log.Printf("[Error] Read cache file failed: %v", err)
+			logger.Errorf("Read cache file failed: %v", err)
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"found":   false,
 				"content": "",
@@ -214,18 +214,18 @@ func handleUpdateCache(w http.ResponseWriter, r *http.Request, cacheDir string) 
 	// 读取请求体
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("[Error] Failed to read body: %v", err)
+		logger.Errorf("Failed to read body: %v", err)
 		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Invalid request body"})
 		return
 	}
 	defer r.Body.Close()
 
-	log.Printf("[Debug] update_cache received: %s", string(body))
+	logger.Debugf("update_cache received: %s", string(body))
 
 	// 解析 JSON 请求体
 	var req CacheRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		log.Printf("[Error] JSON parse failed: %v", err)
+		logger.Errorf("JSON parse failed: %v", err)
 		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": "Invalid JSON"})
 		return
 	}
@@ -241,7 +241,7 @@ func handleUpdateCache(w http.ResponseWriter, r *http.Request, cacheDir string) 
 	filePath := filepath.Join(cacheDir, safeName+".lrc")
 
 	if err := os.WriteFile(filePath, []byte(req.LRC), 0644); err != nil {
-		log.Printf("[Error] Write cache file failed: %v", err)
+		logger.Errorf("Write cache file failed: %v", err)
 		json.NewEncoder(w).Encode(map[string]interface{}{"success": false, "error": err.Error()})
 		return
 	}
@@ -469,7 +469,7 @@ func handleFonts(w http.ResponseWriter, r *http.Request) {
 
 	fonts, err := fonts.GetSystemFonts()
 	if err != nil {
-		log.Printf("[Error] Failed to get system fonts: %v", err)
+		logger.Errorf("Failed to get system fonts: %v", err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   err.Error(),

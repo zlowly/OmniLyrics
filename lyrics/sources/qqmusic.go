@@ -9,13 +9,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/zlowly/OmniLyrics/logger"
 )
 
 // QRCKey 是 QQ 音乐歌词解密的固定密钥。
@@ -407,7 +408,7 @@ func DecryptQRC(encryptedHex string) (string, error) {
 
 	// 调试：打印解密后的前几个字节
 	end := min(10, len(result))
-	log.Printf("[QQMusic] 解密后数据长度: %d, 前10字节: %x", len(result), result[:end])
+	logger.Debugf("[QQMusic] 解密后数据长度: %d, 前10字节: %x", len(result), result[:end])
 
 	// Step 3: zlib 解压
 	uncompressed, err := zlibInflate(result)
@@ -489,7 +490,7 @@ func (s *QQMusicSource) Search(ctx context.Context, title, artist string, durati
 		return "", nil // 未找到歌曲
 	}
 
-	log.Printf("[QQMusic] 找到歌曲: songID=%d, songMid=%s", result.SongID, result.SongMid)
+	logger.Infof("[QQMusic] 找到歌曲: songID=%d, songMid=%s", result.SongID, result.SongMid)
 
 	// 步骤2：获取加密歌词（使用新的API）
 	encrypted, err := s.getLyricsByID(ctx, result.SongID, title, artist, duration)
@@ -573,7 +574,7 @@ func (s *QQMusicSource) searchSong(ctx context.Context, title, artist string) *s
 		return nil
 	}
 
-	log.Printf("[QQMusic] 搜索响应: %s", string(respBody))
+	logger.Debugf("[QQMusic] 搜索响应: %s", string(respBody))
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(respBody, &result); err != nil {
@@ -583,19 +584,19 @@ func (s *QQMusicSource) searchSong(ctx context.Context, title, artist string) *s
 	// 提取 request 数据
 	reqData, ok := result["request"].(map[string]interface{})
 	if !ok {
-		log.Printf("[QQMusic] 响应结构无效: 缺少 request")
+		logger.Warnf("[QQMusic] 响应结构无效: 缺少 request")
 		return nil
 	}
 
 	data, ok := reqData["data"].(map[string]interface{})
 	if !ok {
-		log.Printf("[QQMusic] 响应结构无效: 缺少 data")
+		logger.Warnf("[QQMusic] 响应结构无效: 缺少 data")
 		return nil
 	}
 
 	bodyData, ok := data["body"].(map[string]interface{})
 	if !ok {
-		log.Printf("[QQMusic] 响应结构无效: 缺少 body")
+		logger.Warnf("[QQMusic] 响应结构无效: 缺少 body")
 		return nil
 	}
 
@@ -628,7 +629,7 @@ func (s *QQMusicSource) searchSong(ctx context.Context, title, artist string) *s
 	}
 
 	if songID == 0 || songMid == "" {
-		log.Printf("[QQMusic] 无法提取 songID 或 songMid, 可用字段: %v", getMapKeys(firstSong))
+		logger.Debugf("[QQMusic] 无法提取 songID 或 songMid, 可用字段: %v", getMapKeys(firstSong))
 		return nil
 	}
 
@@ -712,7 +713,7 @@ func (s *QQMusicSource) getLyricsByID(ctx context.Context, songID int64, title, 
 		return "", err
 	}
 
-	log.Printf("[QQMusic] 歌词响应: %s", string(respBody))
+	logger.Debugf("[QQMusic] 歌词响应: %s", string(respBody))
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(respBody, &result); err != nil {

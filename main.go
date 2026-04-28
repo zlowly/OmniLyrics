@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,8 +11,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/omnilyrics/bridge/lyrics"
-	"github.com/omnilyrics/bridge/smtc"
+	"github.com/zlowly/OmniLyrics/logger"
+	"github.com/zlowly/OmniLyrics/lyrics"
+	"github.com/zlowly/OmniLyrics/smtc"
 )
 
 // main 是程序的入口点，启动 HTTP 服务器并注册所有路由处理器。
@@ -27,7 +27,7 @@ import (
 func main() {
 	// 初始化配置系统（包含日志配置）
 	if err := initConfig(); err != nil {
-		log.Fatalf("[Fatal] Failed to initialize config: %v", err)
+		logger.Fatalf("[Fatal] Failed to initialize config: %v", err)
 	}
 
 	// 根据操作系统选择合适的 SMTC 后端
@@ -44,16 +44,16 @@ func main() {
 
 	// 初始化歌词获取器
 	if err := lyrics.InitFetcher(cacheDir, configDir); err != nil {
-		log.Printf("[Warn] 歌词获取器初始化失败: %v", err)
+		logger.Warnf("歌词获取器初始化失败: %v", err)
 	}
 
 	// 创建缓存目录，用于存储歌词文件
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		log.Printf("[Warn] Cannot create Cache dir: %v", err)
+		logger.Warnf("Cannot create Cache dir: %v", err)
 	}
 	// 创建配置目录，用于存储渲染器配置
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		log.Printf("[Warn] Cannot create Config dir: %v", err)
+		logger.Warnf("Cannot create Config dir: %v", err)
 	}
 
 	// CORS 中间件，为所有响应添加跨域资源共享头
@@ -122,9 +122,9 @@ func main() {
 
 	port := GetPort()
 	addr := ":" + port
-	log.Printf("[Info] OmniLyrics Bridge starting on http://localhost:%s/", port)
-	log.Printf("[Info] Cache dir: %s", cacheDir)
-	log.Printf("[Info] Config dir: %s", configDir)
+	logger.Infof("OmniLyrics Bridge starting on http://localhost:%s/", port)
+	logger.Infof("Cache dir: %s", cacheDir)
+	logger.Infof("Config dir: %s", configDir)
 
 	// 创建带超时的上下文，用于优雅关闭
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -134,23 +134,23 @@ func main() {
 	server := &http.Server{Addr: addr, Handler: nil}
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("[Error] Server error: %v", err)
+			logger.Errorf("Server error: %v", err)
 		}
 	}()
 
 	// 监听退出信号：HTTP shutdown 或系统信号
 	select {
 	case <-ctx.Done():
-		log.Println("[Info] Signal received, stopping server...")
+		logger.Infof("Signal received, stopping server...")
 	case <-shutdownCh:
-		log.Println("[Info] Shutdown requested via HTTP, stopping server...")
+		logger.Infof("Shutdown requested via HTTP, stopping server...")
 	}
 
 	// 强制关闭服务器，立即中断所有连接
 	if err := server.Close(); err != nil {
-		log.Printf("[Error] Server close error: %v", err)
+		logger.Errorf("Server close error: %v", err)
 	}
-	log.Println("[Info] Server stopped")
+	logger.Infof("Server stopped")
 }
 
 // getBaseDir 获取程序的基础目录。

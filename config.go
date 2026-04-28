@@ -6,21 +6,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
+	"github.com/zlowly/OmniLyrics/logger"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-)
-
-// Level 定义日志级别，值越小级别越低。
-// 使用 iota 自动递增：Debug=0, Info=1, Warn=2, Error=3
-type Level int
-
-const (
-	Debug Level = iota
-	Info
-	Warn
-	Error
 )
 
 // Config 定义应用程序的配置结构。
@@ -40,9 +29,6 @@ type LogConfig struct {
 
 // config 全局配置实例
 var config *Config
-
-// logLevel 当前日志级别，默认为 Info
-var logLevel Level = Info
 
 // initFlags 初始化命令行参数。
 // 使用 pflag 替代标准库的 flag，支持更丰富的命令行参数风格。
@@ -141,65 +127,13 @@ func loadConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-// parseLogLevel 解析日志级别字符串。
-// @param levelStr 日志级别字符串 (debug, info, warn, error)
-// @return Level 对应的日志级别
-// @return error 解析失败时返回错误
-func parseLogLevel(levelStr string) (Level, error) {
-	switch strings.ToLower(levelStr) {
-	case "debug":
-		return Debug, nil
-	case "info":
-		return Info, nil
-	case "warn", "warning":
-		return Warn, nil
-	case "error":
-		return Error, nil
-	default:
-		return Info, fmt.Errorf("unknown log level: %s (supported: debug, info, warn, error)", levelStr)
-	}
-}
-
-// shouldLog 检查给定级别是否应该被记录。
-// @param level 要检查的级别
-// @return bool 是否应该记录
-func shouldLog(level Level) bool {
-	return level >= logLevel
-}
-
-// logWithLevel 按级别记录日志。
-// @param level 日志级别
-// @param format 格式化字符串
-// @param args 参数
-func logWithLevel(level Level, format string, args ...interface{}) {
-	if !shouldLog(level) {
-		return
-	}
-
-	prefix := ""
-	switch level {
-	case Debug:
-		prefix = "[Debug] "
-	case Info:
-		prefix = "[Info] "
-	case Warn:
-		prefix = "[Warn] "
-	case Error:
-		prefix = "[Error] "
-	}
-
-	log.Printf(prefix+format, args...)
-}
-
 // setupLogger 配置日志系统。
 // 根据配置设置日志级别和输出目标。
 func setupLogger(cfg *Config) error {
-	// 解析日志级别
-	level, err := parseLogLevel(cfg.Log.Level)
-	if err != nil {
+	// 设置日志级别
+	if err := logger.SetLevelFromString(cfg.Log.Level); err != nil {
 		return err
 	}
-	logLevel = level
 
 	// 设置日志输出目标
 	var writer io.Writer
@@ -225,11 +159,11 @@ func setupLogger(cfg *Config) error {
 	log.SetOutput(writer)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 
-	logWithLevel(Info, "Log level: %s", cfg.Log.Level)
+	logger.Infof("Log level: %s", cfg.Log.Level)
 	if cfg.Log.File != "" {
-		logWithLevel(Info, "Log file: %s", cfg.Log.File)
+		logger.Infof("Log file: %s", cfg.Log.File)
 	} else {
-		logWithLevel(Info, "Log output: stdout")
+		logger.Infof("Log output: stdout")
 	}
 
 	return nil
@@ -254,9 +188,9 @@ func initConfig() error {
 		log.SetFlags(log.Ldate | log.Ltime)
 		// 检查是否是空级别导致的错误（即使用默认值的情况）
 		if config.Log.Level == "" {
-			log.Printf("[Info] Using default log level (info), reason: %v", err)
+			logger.Infof("Using default log level (info), reason: %v", err)
 		} else {
-			log.Printf("[Info] Using default log settings, reason: %v", err)
+			logger.Infof("Using default log settings, reason: %v", err)
 		}
 	}
 

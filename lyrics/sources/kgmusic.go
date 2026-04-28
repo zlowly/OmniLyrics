@@ -8,13 +8,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/zlowly/OmniLyrics/logger"
 )
 
 // KRC_KEY 用于 KRC 解密的异或密钥。
@@ -60,7 +61,7 @@ func (s *KGMusicSource) Search(ctx context.Context, title, artist string, durati
 		return "", nil // 未找到歌曲
 	}
 
-	log.Printf("[KGMusic] 找到歌曲: songId=%s, hash=%s", songID, hash)
+	logger.Infof("[KGMusic] 找到歌曲: songId=%s, hash=%s", songID, hash)
 
 	// 步骤2：获取歌词
 	lyrics, err := s.getLyrics(ctx, songID, hash)
@@ -216,7 +217,7 @@ func (s *KGMusicSource) getLyricCandidate(ctx context.Context, songID, hash stri
 	urlStr := fmt.Sprintf("http://krcs.kugou.com/search?ver=1&man=no&client=pc&hash=%s&album_audio_id=%s&lrctxt=1",
 		url.QueryEscape(hash), url.QueryEscape(songID))
 
-	log.Printf("[KGMusic] 歌词候选请求: songId=%s, hash=%s", songID, hash)
+	logger.Debugf("[KGMusic] 歌词候选请求: songId=%s, hash=%s", songID, hash)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
 	if err != nil {
