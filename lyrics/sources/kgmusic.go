@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -302,45 +303,10 @@ func krcDecryptFromBase64(encoded string) (string, error) {
 		return krcDecrypt(decoded)
 	}
 	// 尝试十六进制解码
-	if bytesVal, err := hexToBytes(encoded); err == nil {
+	if bytesVal, err := hex.DecodeString(encoded); err == nil {
 		return krcDecrypt(bytesVal)
 	}
 	return "", fmt.Errorf("无法解密 KRC 数据")
-}
-
-// hexToBytes 将十六进制字符串转换为字节数组。
-func hexToBytes(s string) ([]byte, error) {
-	if len(s)%2 != 0 {
-		return nil, fmt.Errorf("无效的十六进制长度")
-	}
-	res := make([]byte, 0, len(s)/2)
-	for i := 0; i < len(s); i += 2 {
-		hi := s[i]
-		lo := s[i+1]
-		var high, low byte
-		switch {
-		case hi >= '0' && hi <= '9':
-			high = hi - '0'
-		case hi >= 'a' && hi <= 'f':
-			high = hi - 'a' + 10
-		case hi >= 'A' && hi <= 'F':
-			high = hi - 'A' + 10
-		default:
-			return nil, fmt.Errorf("无效十六进制字符")
-		}
-		switch {
-		case lo >= '0' && lo <= '9':
-			low = lo - '0'
-		case lo >= 'a' && lo <= 'f':
-			low = lo - 'a' + 10
-		case lo >= 'A' && lo <= 'F':
-			low = lo - 'A' + 10
-		default:
-			return nil, fmt.Errorf("无效十六进制字符")
-		}
-		res = append(res, (high<<4)|low)
-	}
-	return res, nil
 }
 
 // krc2lrc 将 KRC 格式歌词转换为 LRC 格式。
@@ -374,27 +340,25 @@ func krc2lrc(krc string) string {
 		if len(wordsInline) > 0 || len(wordsNoInline) > 0 {
 			var lrcLine strings.Builder
 			for _, w := range wordsInline {
-				var wordStart int
 				inlineOffset, _ := strconv.Atoi(w[1])
 				wordOffset, _ := strconv.Atoi(w[3])
-				wordStart = lineStart + inlineOffset + wordOffset
+				wordStart := lineStart + inlineOffset + wordOffset
 				wordContent := strings.TrimSpace(w[6])
 
 				mins := wordStart / 60000
 				secs := (wordStart % 60000) / 1000
-				ms := (wordStart % 1000) / 10
-				fmt.Fprintf(&lrcLine, "[%02d:%02d.%02d]%s", mins, secs, ms, wordContent)
+				millis := wordStart % 1000
+				fmt.Fprintf(&lrcLine, "[%02d:%02d.%03d]%s", mins, secs, millis, wordContent)
 			}
 			for _, w := range wordsNoInline {
-				var wordStart int
 				wordOffset, _ := strconv.Atoi(w[1])
-				wordStart = lineStart + wordOffset
+				wordStart := lineStart + wordOffset
 				wordContent := strings.TrimSpace(w[3])
 
 				mins := wordStart / 60000
 				secs := (wordStart % 60000) / 1000
-				ms := (wordStart % 1000) / 10
-				fmt.Fprintf(&lrcLine, "[%02d:%02d.%02d]%s", mins, secs, ms, wordContent)
+				millis := wordStart % 1000
+				fmt.Fprintf(&lrcLine, "[%02d:%02d.%03d]%s", mins, secs, millis, wordContent)
 			}
 			if lrcLine.Len() > 0 {
 				result.WriteString(lrcLine.String())
@@ -404,8 +368,8 @@ func krc2lrc(krc string) string {
 			if lineContent != "" {
 				mins := lineStart / 60000
 				secs := (lineStart % 60000) / 1000
-				ms := (lineStart % 1000) / 10
-				fmt.Fprintf(&result, "[%02d:%02d.%02d]%s\n", mins, secs, ms, lineContent)
+				millis := lineStart % 1000
+				fmt.Fprintf(&result, "[%02d:%02d.%03d]%s\n", mins, secs, millis, lineContent)
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 // tests/lyrics_qm.go
-// 单文件实现 QQ音乐/全民K歌歌词获取
+// 单文件实现 QQ音乐歌词获取
 // Usage: go run ./tests/lyrics_qm.go "歌手名" "歌名" [时长秒]
 
 package main
@@ -8,9 +8,10 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -22,7 +23,7 @@ import (
 
 // ==================== QRC 解密相关 ====================
 
-var QRC_KEY = []byte("!@#)(*$%123ZXC!@!@#)(NHL")
+var QRC_KEY = []byte("!@#)(*$%123ZXC!@!@#)(NHL") // 24字节密钥
 
 var sbox = [8][64]int{
 	{
@@ -345,45 +346,12 @@ func tripledes3Crypt(data []byte, key [][][]int) []byte {
 	return result
 }
 
-func hexToBytes(s string) ([]byte, error) {
-	if len(s)%2 != 0 {
-		return nil, nil
-	}
-	result := make([]byte, 0, len(s)/2)
-	for i := 0; i < len(s); i += 2 {
-		var b byte
-		c := s[i : i+2]
-		switch {
-		case c[0] >= '0' && c[0] <= '9':
-			b = (c[0] - '0') << 4
-		case c[0] >= 'a' && c[0] <= 'f':
-			b = (c[0] - 'a' + 10) << 4
-		case c[0] >= 'A' && c[0] <= 'F':
-			b = (c[0] - 'A' + 10) << 4
-		default:
-			return nil, nil
-		}
-		switch {
-		case c[1] >= '0' && c[1] <= '9':
-			b |= c[1] - '0'
-		case c[1] >= 'a' && c[1] <= 'f':
-			b |= c[1] - 'a' + 10
-		case c[1] >= 'A' && c[1] <= 'F':
-			b |= c[1] - 'A' + 10
-		default:
-			return nil, nil
-		}
-		result = append(result, b)
-	}
-	return result, nil
-}
-
 func qrcDecrypt(encryptedQrc string) (string, error) {
 	if encryptedQrc == "" {
 		return "", nil
 	}
 
-	encryptedTextByte, err := hexToBytes(encryptedQrc)
+	encryptedTextByte, err := hex.DecodeString(encryptedQrc)
 	if err != nil {
 		return "", err
 	}
@@ -391,28 +359,20 @@ func qrcDecrypt(encryptedQrc string) (string, error) {
 	schedule := tripledesKeySetup(QRC_KEY, DECRYPT)
 	data := tripledes3Crypt(encryptedTextByte, schedule)
 
-	r := bytes.NewReader(data)
-	zlibReader, err := zlib.NewReader(r)
+	r, err := zlib.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return "", err
 	}
-	defer zlibReader.Close()
+	defer r.Close()
 
-	output, err := ioutil.ReadAll(zlibReader)
+	output, err := io.ReadAll(r)
 	if err != nil {
 		return "", err
 	}
 	return string(output), nil
-	//	output := make([]byte, 4096)
-	//	n, err := zlibReader.Read(output)
-	//	if err != nil && err.Error() != "EOF" {
-	//		return "", err
-	//	}
-
-	// return string(output[:n]), nil
 }
 
-// ==================== QQ音乐客户端 ====================
+// ==================== QQ音乐客户端（未修改）====================
 
 type SongInfo struct {
 	ID       int64
@@ -509,6 +469,11 @@ func (q *QMCloud) request(method string, module string, param map[string]interfa
 		},
 	}
 	b, _ := json.Marshal(payload)
+
+	// 调试：打印请求信息
+	reqBody := string(b)
+	fmt.Fprintf(os.Stderr, "\n=== HTTP 请求 ===\nURL: https://u.y.qq.com/cgi-bin/musicu.fcg\nMethod: %s, Module: %s\nBody: %s\n\n", method, module, reqBody)
+
 	resp, err := q.client.Post("https://u.y.qq.com/cgi-bin/musicu.fcg", "application/json", strings.NewReader(string(b)))
 	if err != nil {
 		return nil, err
@@ -517,8 +482,13 @@ func (q *QMCloud) request(method string, module string, param map[string]interfa
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("歌词请求失败: %s", resp.Status)
 	}
+	body, _ := io.ReadAll(resp.Body)
+
+	// 调试：打印响应信息
+	fmt.Fprintf(os.Stderr, "=== HTTP 响应 ===\nStatus: %s\nBody[:1000]: %s\n\n", resp.Status, string(body[:min(1000, len(body))]))
+
 	var res map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&res); err != nil {
 		return nil, err
 	}
 	if req, ok := res["request"].(map[string]interface{}); ok {
@@ -537,6 +507,7 @@ func (q *QMCloud) GetLyricsForSong(info SongInfo) (string, error) {
 	singerName := base64.StdEncoding.EncodeToString([]byte(info.Singer))
 	songName := base64.StdEncoding.EncodeToString([]byte(info.Title))
 	interval := int(info.Duration / 1000)
+
 	param := map[string]interface{}{
 		"albumName":  albumName,
 		"crypt":      1,
@@ -586,85 +557,69 @@ func decryptLyricIfPossible(s string) string {
 	}
 	result, err := qrcDecrypt(s)
 	if err != nil {
+		// 解密失败，返回原始字符串（可能是未加密的 LRC）
 		return s
 	}
 	return result
 }
 
 // qrc2lrc 将 QRC 格式歌词转换为逐字 LRC 格式。
-// QRC 格式：XML 结构，歌词内容在 LyricContent 属性中，格式为 [行起始ms,行持续ms]字(偏移,持续)...
-// 返回：逐字 LRC 格式，每个字都有时间戳，如 [00:00.00]晴[00:00.16]天
 func qrc2lrc(qrcXML string) string {
-	// 提取 LyricContent 内容 - 找到开始和结束位置
 	startMarker := `LyricContent="`
 	endMarker := `"/>`
 
 	startIdx := strings.Index(qrcXML, startMarker)
 	if startIdx < 0 {
-		return qrcXML // 不是QRC格式
+		return qrcXML
 	}
-
 	startIdx += len(startMarker)
 	endIdx := strings.Index(qrcXML[startIdx:], endMarker)
 	if endIdx < 0 {
 		return qrcXML
 	}
-
 	content := qrcXML[startIdx : startIdx+endIdx]
 	lines := strings.Split(content, "\n")
 
-	// 行匹配正则：^\[行起始时间,行持续时间\]行内容$
 	lineRe := regexp.MustCompile(`^\[(\d+),(\d+)\](.*)$`)
-	// 逐字匹配正则：内容(起始偏移,持续时间)
 	wordRe := regexp.MustCompile(`([^\(]*)\((\d+),(\d+)\)`)
 
 	var result strings.Builder
-
 	for _, rawLine := range lines {
 		line := strings.TrimSpace(rawLine)
 		if line == "" {
 			continue
 		}
-
 		lineMatch := lineRe.FindStringSubmatch(line)
 		if lineMatch == nil {
-			// 如果不是歌词行（如标签行），跳过
 			continue
 		}
-
 		lineStart, _ := strconv.Atoi(lineMatch[1])
 		lineContent := lineMatch[3]
 
-		// 匹配所有逐字时间戳
 		wordMatches := wordRe.FindAllStringSubmatch(lineContent, -1)
 		if wordMatches == nil {
-			// 如果没有逐字时间戳，使用行起始时间
 			result.WriteString(fmt.Sprintf("[%s]%s\n", msToTimeStr(lineStart), lineContent))
 			continue
 		}
-
-		// 生成逐字 LRC
-		for _, wm := range wordMatches {
+		for i, wm := range wordMatches {
 			wordContent := wm[1]
 			wordOffset, _ := strconv.Atoi(wm[2])
-			// wordDuration, _ := strconv.Atoi(wm[3]) // 暂时不用
-
-			absTime := lineStart + wordOffset
-			result.WriteString(fmt.Sprintf("[%s]%s", msToTimeStr(absTime), wordContent))
+			wordDuration, _ := strconv.Atoi(wm[3])
+			result.WriteString(fmt.Sprintf("[%s]%s", msToTimeStr(wordOffset), wordContent))
+			if i == len(wordMatches)-1 {
+				result.WriteString(fmt.Sprintf("[%s]", msToTimeStr(wordOffset+wordDuration)))
+			}
 		}
 		result.WriteString("\n")
 	}
-
 	return result.String()
 }
 
-// msToTimeStr 将毫秒转换为 LRC 时间格式 [mm:ss.xx]
 func msToTimeStr(ms int) string {
-	totalMs := ms
-	minutes := totalMs / 60000
-	seconds := (totalMs % 60000) / 1000
-	centiseconds := (totalMs % 1000) / 10
-	return fmt.Sprintf("%02d:%02d.%02d", minutes, seconds, centiseconds)
+	minutes := ms / 60000
+	seconds := (ms % 60000) / 1000
+	milliseconds := ms % 1000
+	return fmt.Sprintf("%02d:%02d.%03d", minutes, seconds, milliseconds)
 }
 
 func searchSongs(client *http.Client, comm map[string]interface{}, artist, title string) ([]SongInfo, error) {
@@ -699,7 +654,7 @@ func searchSongs(client *http.Client, comm map[string]interface{}, artist, title
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("搜索请求失败: %s", resp.Status)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -776,6 +731,13 @@ func main() {
 	artist := os.Args[1]
 	title := os.Args[2]
 
+	durationSec := 0
+	if len(os.Args) == 4 {
+		if v, err := strconv.Atoi(os.Args[3]); err == nil {
+			durationSec = v
+		}
+	}
+
 	cloud := newQMCloud()
 	if err := cloud.initSession(); err != nil {
 		log.Fatalf("初始化会话失败: %v", err)
@@ -788,9 +750,9 @@ func main() {
 
 	fmt.Printf("找到 %d 首歌曲\n\n", len(results))
 	for i, s := range results {
-		durationSec := s.Duration / 1000
+		songDuration := s.Duration / 1000
 		fmt.Printf("[%d] ID: %d, Mid: %s, Title: %s, Singer: %s, Duration: %d s\n",
-			i+1, s.ID, s.Mid, s.Title, s.Singer, durationSec)
+			i+1, s.ID, s.Mid, s.Title, s.Singer, songDuration)
 	}
 
 	if len(results) == 0 {
@@ -798,13 +760,31 @@ func main() {
 		return
 	}
 
-	first := results[0]
-	lyric, err := cloud.GetLyricsForSong(first)
+	song := results[0]
+	if durationSec > 0 {
+		bestIdx := 0
+		bestDiff := 999999
+		for i, s := range results {
+			d := s.Duration / 1000
+			diff := d - durationSec
+			if diff < 0 {
+				diff = -diff
+			}
+			if diff < bestDiff {
+				bestDiff = diff
+				bestIdx = i
+			}
+		}
+		song = results[bestIdx]
+		fmt.Printf("\n选择匹配歌曲: [%d] ID: %d, Duration: %d s\n",
+			bestIdx+1, song.ID, song.Duration/1000)
+	}
+
+	lyric, err := cloud.GetLyricsForSong(song)
 	if err != nil {
 		log.Fatalf("获取歌词失败: %v", err)
 	}
 
-	// 转换为逐字 LRC 格式
 	lrcLyric := qrc2lrc(lyric)
 
 	fmt.Println("\nLRC 歌词内容:")

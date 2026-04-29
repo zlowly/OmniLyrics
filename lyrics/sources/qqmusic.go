@@ -824,7 +824,7 @@ func (s *QQMusicSource) getLyricsByID(ctx context.Context, songID int64, title, 
 
 // qrc2lrc 将 QRC 格式歌词转换为逐字 LRC 格式。
 // QRC 格式：XML 结构，歌词内容在 LyricContent 属性中，格式为 [行起始ms,行持续ms]字(偏移,持续)...
-// 返回：逐字 LRC 格式，每个字都有时间戳，如 [00:00.00]晴[00:00.16]天
+// 返回：逐字 LRC 格式，每个字都有时间戳，如 [00:00.000]晴[00:00.016]天
 func qrc2lrc(qrcXML string) string {
 	startMarker := `LyricContent="`
 	endMarker := `"/>`
@@ -859,20 +859,19 @@ func qrc2lrc(qrcXML string) string {
 			continue
 		}
 
-		lineStart, _ := strconv.Atoi(lineMatch[1])
-		lineContent := lineMatch[3]
-
-		wordMatches := wordRe.FindAllStringSubmatch(lineContent, -1)
+		wordMatches := wordRe.FindAllStringSubmatch(line, -1)
 		if wordMatches == nil {
-			result.WriteString(fmt.Sprintf("[%s]%s\n", msToTimeStr(lineStart), lineContent))
 			continue
 		}
 
-		for _, wm := range wordMatches {
+		for i, wm := range wordMatches {
 			wordContent := wm[1]
 			wordOffset, _ := strconv.Atoi(wm[2])
-			absTime := lineStart + wordOffset
-			result.WriteString(fmt.Sprintf("[%s]%s", msToTimeStr(absTime), wordContent))
+			wordDuration, _ := strconv.Atoi(wm[3])
+			result.WriteString(fmt.Sprintf("[%s]%s", msToTimeStr(wordOffset), wordContent))
+			if i == len(wordMatches)-1 {
+				result.WriteString(fmt.Sprintf("[%s]", msToTimeStr(wordOffset+wordDuration)))
+			}
 		}
 		result.WriteString("\n")
 	}
