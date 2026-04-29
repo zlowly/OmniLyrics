@@ -262,122 +262,62 @@ class PVRenderer extends LyricsRendererBase {
         `;
     }
 
-    // 将 lrcData 转换为 PV 内部格式
-    convertLrcData(lrcData) {
-        if (!lrcData || !lrcData.length) return { flat: [], grouped: [] };
-
-        const flat = [];
-        const grouped = [];
-        let globalIndex = 0;
-
-        lrcData.forEach((line, lineId) => {
-            const lineWords = [];
-            const text = line.text || '';
-            const words = line.words || [];
-
-            if (words.length > 1) {
-                // 有逐字时间戳
-                words.forEach((word, idx) => {
-                    const start = word.time / 1000; // 转换为秒
-                    const end = idx < words.length - 1
-                        ? words[idx + 1].time / 1000
-                        : (line.endTime || line.time + 2000) / 1000;
-
-                    flat.push({
-                        text: word.text,
-                        start,
-                        end,
-                        lineId,
-                        globalIndex: globalIndex++,
-                        isHeavy: false
-                    });
-                    lineWords.push({
-                        text: word.text,
-                        start,
-                        end,
-                        lineId,
-                        globalIndex: globalIndex - 1,
-                        isHeavy: false
-                    });
-                });
-            } else if (text) {
-                // 无逐字时间戳，整行处理
-                const start = line.time / 1000;
-                const end = (line.endTime || line.time + 2000) / 1000;
-                const chars = text.split('').filter(c => c.trim());
-
-                chars.forEach((char, idx) => {
-                    const charStart = start + (idx / Math.max(chars.length, 1)) * (end - start);
-                    const charEnd = idx < chars.length - 1
-                        ? start + ((idx + 1) / Math.max(chars.length, 1)) * (end - start)
-                        : end;
-
-                    flat.push({
-                        text: char,
-                        start: charStart,
-                        end: charEnd,
-                        lineId,
-                        globalIndex: globalIndex++,
-                        isHeavy: false
-                    });
-                    lineWords.push({
-                        text: char,
-                        start: charStart,
-                        end: charEnd,
-                        lineId,
-                        globalIndex: globalIndex - 1,
-                        isHeavy: false
-                    });
-                });
-            }
-
-            if (lineWords.length > 0) {
-                grouped.push(lineWords);
-            }
-        });
-
-        // 标记长音字
-        if (flat.length > 0) {
-            const avgDuration = flat.reduce((sum, w) => sum + (w.end - w.start), 0) / flat.length;
-            flat.forEach(w => {
-                w.isHeavy = (w.end - w.start) > avgDuration * 1.5;
-            });
-        }
-
-        return { flat, grouped };
-    }
-
     // 构建 DOM 结构
-    buildDOM(wordsGrouped) {
-        if (!this.container) return [];
+    // lrcData: 原始歌词数据数组，每个元素包含 text、time、endTime、words 等
+    buildDOM(lrcData) {
+        if (!this.container || !lrcData || !lrcData.length) return [];
 
         this.container.innerHTML = '';
         const lineElements = [];
         const pvConfig = this.getPVConfig();
-        const showNextLine = pvConfig.showNextLine !== false;
 
-        wordsGrouped.forEach((lineWords, lineIdx) => {
+        lrcData.forEach((line, lineIdx) => {
             const lineDiv = document.createElement('div');
             lineDiv.className = 'pv-line';
             lineDiv.setAttribute('data-line-idx', lineIdx);
 
             // 构建字符元素
-            lineWords.forEach((word, wordIdx) => {
-                const charSpan = document.createElement('span');
-                charSpan.className = 'pv-char';
-                charSpan.setAttribute('data-char-idx', `${lineIdx}_${wordIdx}`);
+            const words = line.words || [];
+            if (words.length > 0) {
+                // 有逐字信息，按单词/字符显示
+                words.forEach((word, wordIdx) => {
+                    const charSpan = document.createElement('span');
+                    charSpan.className = 'pv-char';
+                    charSpan.setAttribute('data-char-idx', `${lineIdx}_${wordIdx}`);
 
-                const textSpan = document.createElement('span');
-                textSpan.className = 'pv-char-text';
-                textSpan.textContent = word.text;
+                    const textSpan = document.createElement('span');
+                    textSpan.className = 'pv-char-text';
+                    textSpan.textContent = word.text;
 
-                const fillSpan = document.createElement('span');
-                fillSpan.className = 'pv-char-fill';
+                    const fillSpan = document.createElement('span');
+                    fillSpan.className = 'pv-char-fill';
 
-                charSpan.appendChild(textSpan);
-                charSpan.appendChild(fillSpan);
-                lineDiv.appendChild(charSpan);
-            });
+                    charSpan.appendChild(textSpan);
+                    charSpan.appendChild(fillSpan);
+                    lineDiv.appendChild(charSpan);
+                });
+            } else {
+                // 无逐字信息，按字符显示
+                const text = line.text || '';
+                const chars = text.split('').filter(c => c.trim());
+
+                chars.forEach((char, charIdx) => {
+                    const charSpan = document.createElement('span');
+                    charSpan.className = 'pv-char';
+                    charSpan.setAttribute('data-char-idx', `${lineIdx}_${charIdx}`);
+
+                    const textSpan = document.createElement('span');
+                    textSpan.className = 'pv-char-text';
+                    textSpan.textContent = char;
+
+                    const fillSpan = document.createElement('span');
+                    fillSpan.className = 'pv-char-fill';
+
+                    charSpan.appendChild(textSpan);
+                    charSpan.appendChild(fillSpan);
+                    lineDiv.appendChild(charSpan);
+                });
+            }
 
             this.container.appendChild(lineDiv);
             lineElements.push(lineDiv);
@@ -393,107 +333,232 @@ class PVRenderer extends LyricsRendererBase {
     }
 
     // 构建 GSAP Timeline
-    buildTimeline(wordsFlat, wordsGrouped, lineDivs, template) {
+    // lrcData: 原始歌词数据，直接使用其中的 time/endTime（毫秒）
+    buildTimeline(lrcData, lineDivs, template) {
         const pvConfig = this.getPVConfig();
         const tl = gsap.timeline({ paused: true });
+        const animLog = [];  // 按行分组的动画日志
 
-        // 计算每行的时间范围
-        const lineTimeRanges = wordsGrouped.map(lineWords => ({
-            start: lineWords[0].start,
-            end: lineWords[lineWords.length - 1].end
+        // 辅助记录函数
+        function logAnim(lineIdx, type, startTime, duration, targetDesc) {
+            if (!animLog[lineIdx]) {
+                animLog[lineIdx] = [];
+            }
+            animLog[lineIdx].push({
+                type,
+                startTime: parseFloat(startTime.toFixed(3)),
+                endTime: parseFloat((startTime + duration).toFixed(3)),
+                duration: parseFloat(duration.toFixed(3)),
+                targetDesc
+            });
+        }
+
+        if (!lrcData || !lrcData.length) return tl;
+
+        // 计算每行的时间范围（毫秒 → 秒，GSAP使用秒作为时间单位）
+        const lineTimeRanges = lrcData.map(line => ({
+            start: line.time / 1000,
+            end: (line.endTime || line.time + 2000) / 1000
         }));
 
         // 整行显隐动画
-        wordsGrouped.forEach((lineWords, lineIdx) => {
+        lrcData.forEach((line, lineIdx) => {
             const lineStart = lineTimeRanges[lineIdx].start;
             const lineEnd = lineTimeRanges[lineIdx].end;
             const lineDiv = lineDivs[lineIdx];
 
+            if (!lineDiv) return;
+
             // 句子开始时显示行
             tl.set(lineDiv, { visibility: 'visible', opacity: 0, scale: 0.96 }, lineStart);
+            logAnim(lineIdx, '整行显示', lineStart, 0, `行 ${lineIdx}`);
+
             tl.to(lineDiv, { opacity: 1, scale: 1, duration: 0.12, ease: 'power2.out' }, lineStart);
+            logAnim(lineIdx, '整行淡入', lineStart, 0.12, `行 ${lineIdx}`);
 
             // 句子末尾淡出
             tl.to(lineDiv, { opacity: 0, duration: 0.1, ease: 'power1.in' }, lineEnd);
+            logAnim(lineIdx, '整行淡出', lineEnd, 0.1, `行 ${lineIdx}`);
+
             tl.set(lineDiv, { visibility: 'hidden' }, lineEnd + 0.05);
+            logAnim(lineIdx, '整行隐藏', lineEnd + 0.05, 0, `行 ${lineIdx}`);
         });
 
         // 下一行预览效果
         const showNextLine = pvConfig.showNextLine !== false;
         if (showNextLine) {
-            for (let i = 0; i < wordsGrouped.length - 1; i++) {
+            for (let i = 0; i < lrcData.length - 1; i++) {
                 const currentLineEnd = lineTimeRanges[i].end;
                 const nextLineDiv = lineDivs[i + 1];
 
+                if (!nextLineDiv) continue;
+
                 // 在当前行结束后显示下一行预览
                 tl.set(nextLineDiv, { visibility: 'visible', opacity: 0.4, scale: 0.85 }, currentLineEnd - 0.2);
+                logAnim(i + 1, '下一行预览显示', currentLineEnd - 0.2, 0, `行 ${i + 1}`);
+
                 tl.to(nextLineDiv, { opacity: 0.55, duration: 0.2 }, currentLineEnd - 0.2);
+                logAnim(i + 1, '下一行预览淡入', currentLineEnd - 0.2, 0.2, `行 ${i + 1}`);
 
                 // 下一句真正开始时恢复正常样式
                 const nextLineStart = lineTimeRanges[i + 1].start;
                 tl.to(nextLineDiv, { opacity: 1, scale: 1, duration: 0.15, clearProps: 'all' }, nextLineStart);
+                logAnim(i + 1, '下一行恢复样式', nextLineStart, 0.15, `行 ${i + 1}`);
             }
         }
 
         // 逐字入场 + 卡拉OK填充动画
-        wordsFlat.forEach((word, idx) => {
-            const lineIdx = word.lineId;
+        lrcData.forEach((line, lineIdx) => {
             const lineDiv = lineDivs[lineIdx];
             if (!lineDiv) return;
 
             const charElements = lineDiv.querySelectorAll('.pv-char');
-            const wordsInLine = wordsGrouped[lineIdx];
-            const charIndexInLine = wordsInLine.findIndex(w => w.globalIndex === word.globalIndex);
+            const words = line.words || [];
 
-            if (charIndexInLine === -1 || charIndexInLine >= charElements.length) return;
+            if (words.length > 0) {
+                // 有逐字时间戳
+                words.forEach((word, wordIdx) => {
+                    // 毫秒 → 秒（GSAP Timeline时间单位）
+                    const wordStart = word.time / 1000;
+                    const wordEnd = wordIdx < words.length - 1
+                        ? words[wordIdx + 1].time / 1000
+                        : (line.endTime || line.time + 2000) / 1000;
 
-            const charEl = charElements[charIndexInLine];
-            const fillEl = charEl.querySelector('.pv-char-fill');
+                    if (wordIdx >= charElements.length) return;
 
-            if (!charEl) return;
+                    const charEl = charElements[wordIdx];
+                    const fillEl = charEl.querySelector('.pv-char-fill');
 
-            // 入场动画
-            const enterConfig = template.charEnter || {};
-            const from = { ...enterConfig.from };
-            const to = { ...enterConfig.to };
-            const duration = enterConfig.duration || 0.12;
-            const ease = enterConfig.ease || 'back.out(0.7)';
+                    // 入场动画
+                    const enterConfig = template.charEnter || {};
+                    const from = { ...enterConfig.from };
+                    const to = { ...enterConfig.to };
+                    const duration = enterConfig.duration || 0.12;
+                    const ease = enterConfig.ease || 'back.out(0.7)';
 
-            tl.fromTo(charEl, from, { ...to, duration, ease }, word.start);
+                    tl.fromTo(charEl, from, { ...to, duration, ease }, wordStart);
+                    logAnim(lineIdx, '字符入场', wordStart, duration, `"${word.text}"`);
 
-            // 卡拉OK填充动画
-            if (fillEl && template.fillEffect !== 'none') {
-                const fillDuration = word.end - word.start;
-                const fillTiming = template.fillTiming || 'linear';
+                    // 卡拉OK填充动画
+                    let fillCompletionTime = wordEnd;
+                    if (fillEl && template.fillEffect !== 'none') {
+                        const fillDuration = wordEnd - wordStart;
+                        const fillTiming = template.fillTiming || 'linear';
 
-                tl.fromTo(fillEl,
-                    { scaleX: 0 },
-                    { scaleX: 1, duration: fillDuration, ease: fillTiming },
-                    word.start
-                );
-            }
+                        tl.fromTo(fillEl,
+                            { scaleX: 0 },
+                            { scaleX: 1, duration: fillDuration, ease: fillTiming },
+                            wordStart
+                        );
+                        logAnim(lineIdx, '填充', wordStart, fillDuration, `"${word.text}"填充层`);
+                        fillCompletionTime = wordStart + fillDuration;
+                    }
 
-            // 退场动画
-            const exitConfig = template.charExit || {};
-            if (exitConfig.to) {
-                const exitDuration = exitConfig.duration || 0.08;
-                const exitEase = exitConfig.ease || 'power2.in';
-                tl.to(charEl, { ...exitConfig.to, duration: exitDuration, ease: exitEase }, word.end - 0.05);
-            }
+                    // 退场动画（在填充完成后开始）
+                    const exitConfig = template.charExit || {};
+                    if (exitConfig.to) {
+                        const exitDuration = exitConfig.duration || 0.08;
+                        const exitEase = exitConfig.ease || 'power2.in';
+                        const exitStart = fillCompletionTime + 0.05;
+                        tl.to(charEl, { ...exitConfig.to, duration: exitDuration, ease: exitEase }, exitStart);
+                        logAnim(lineIdx, '字符退场', exitStart, exitDuration, `"${word.text}"`);
+                    }
 
-            // 长音字震动效果
-            if (word.isHeavy && template.shakeOnHeavy) {
-                const shakeIntensity = template.shakeIntensity || { x: 3, y: 3, duration: 0.05, repeats: 2 };
-                tl.to(charEl, {
-                    x: `random(-${shakeIntensity.x}, ${shakeIntensity.x})`,
-                    y: `random(-${shakeIntensity.y}, ${shakeIntensity.y})`,
-                    duration: shakeIntensity.duration,
-                    repeat: shakeIntensity.repeats,
-                    yoyo: true,
-                    ease: 'none'
-                }, word.start);
+                    // 长音字震动效果
+                    if (template.shakeOnHeavy) {
+                        const avgDuration = (words.reduce((sum, w, idx) => {
+                            const ws = w.time / 1000;
+                            const we = idx < words.length - 1 ? words[idx + 1].time / 1000 : (line.endTime || line.time + 2000) / 1000;
+                            return sum + (we - ws);
+                        }, 0) / words.length);
+
+                        if ((wordEnd - wordStart) > avgDuration * 1.5) {
+                            const shakeIntensity = template.shakeIntensity || { x: 3, y: 3, duration: 0.05, repeats: 2 };
+                            const shakeDuration = shakeIntensity.duration || 0.05;
+                            tl.to(charEl, {
+                                x: `random(-${shakeIntensity.x}, ${shakeIntensity.x})`,
+                                y: `random(-${shakeIntensity.y}, ${shakeIntensity.y})`,
+                                duration: shakeDuration,
+                                repeat: shakeIntensity.repeats,
+                                yoyo: true,
+                                ease: 'none'
+                            }, wordStart);
+                            logAnim(lineIdx, '长音震动', wordStart, shakeDuration, `"${word.text}"`);
+                        }
+                    }
+                });
+            } else {
+                // 无逐字时间戳，按字符均匀分配时间
+                const text = line.text || '';
+                const chars = text.split('').filter(c => c.trim());
+                // 毫秒 → 秒
+                const lineStart = line.time / 1000;
+                const lineEnd = (line.endTime || line.time + 2000) / 1000;
+
+                chars.forEach((char, charIdx) => {
+                    // 均匀分配每个字符的时间段
+                    const charStart = lineStart + (charIdx / Math.max(chars.length, 1)) * (lineEnd - lineStart);
+                    const charEnd = charIdx < chars.length - 1
+                        ? lineStart + ((charIdx + 1) / Math.max(chars.length, 1)) * (lineEnd - lineStart)
+                        : lineEnd;
+
+                    if (charIdx >= charElements.length) return;
+
+                    const charEl = charElements[charIdx];
+                    const fillEl = charEl.querySelector('.pv-char-fill');
+
+                    // 入场动画
+                    const enterConfig = template.charEnter || {};
+                    const from = { ...enterConfig.from };
+                    const to = { ...enterConfig.to };
+                    const duration = enterConfig.duration || 0.12;
+                    const ease = enterConfig.ease || 'back.out(0.7)';
+
+                    tl.fromTo(charEl, from, { ...to, duration, ease }, charStart);
+                    logAnim(lineIdx, '字符入场', charStart, duration, `"${char}"`);
+
+                    // 卡拉OK填充动画
+                    let fillCompletionTime = charEnd;
+                    if (fillEl && template.fillEffect !== 'none') {
+                        const fillDuration = charEnd - charStart;
+                        const fillTiming = template.fillTiming || 'linear';
+
+                        tl.fromTo(fillEl,
+                            { scaleX: 0 },
+                            { scaleX: 1, duration: fillDuration, ease: fillTiming },
+                            charStart
+                        );
+                        logAnim(lineIdx, '填充', charStart, fillDuration, `"${char}"填充层`);
+                        fillCompletionTime = charStart + fillDuration;
+                    }
+
+                    // 退场动画（在填充完成后开始）
+                    const exitConfig = template.charExit || {};
+                    if (exitConfig.to) {
+                        const exitDuration = exitConfig.duration || 0.08;
+                        const exitEase = exitConfig.ease || 'power2.in';
+                        const exitStart = fillCompletionTime + 0.05;
+                        tl.to(charEl, { ...exitConfig.to, duration: exitDuration, ease: exitEase }, exitStart);
+                        logAnim(lineIdx, '字符退场', exitStart, exitDuration, `"${char}"`);
+                    }
+                });
             }
         });
+
+        // 将日志挂载到全局，方便控制台查看
+        window.__gsapAnimLog = animLog;
+        window.printTimeline = function() {
+            console.log('=== PV模式 Timeline 动画记录 ===');
+            animLog.forEach((lineAnims, lineIdx) => {
+                if (lineAnims && lineAnims.length > 0) {
+                    console.group(`第 ${lineIdx} 行 (共${lineAnims.length}个动画)`);
+                    console.table(lineAnims);
+                    console.groupEnd();
+                }
+            });
+            console.log(`总动画数: ${animLog.flat().length}`);
+            console.log('时间线总时长:', tl.duration().toFixed(3));
+        };
 
         return tl;
     }
@@ -534,24 +599,24 @@ class PVRenderer extends LyricsRendererBase {
             this.lastLineIndex = currentIndex;
             this.reset();
 
-            const { flat, grouped } = this.convertLrcData(motion.lrcData);
-
-            if (grouped.length === 0) return;
+            if (motion.lrcData.length === 0) return;
 
             const template = this.getCurrentTemplate();
-            const lineDivs = this.buildDOM(grouped);
-            this.mainTimeline = this.buildTimeline(flat, grouped, lineDivs, template);
+            const lineDivs = this.buildDOM(motion.lrcData);
+            this.mainTimeline = this.buildTimeline(motion.lrcData, lineDivs, template);
 
             // 同步到当前位置
             if (this.mainTimeline && position > 0) {
+                // 毫秒 → 秒
                 const targetTime = position / 1000;
 
-                // 找到当前行
+                // 找到当前行的开始时间
                 let currentLineStart = 0;
-                for (let i = 0; i < grouped.length; i++) {
-                    const lineWords = grouped[i];
-                    if (lineWords[0] && targetTime >= lineWords[0].start) {
-                        currentLineStart = lineWords[0].start;
+                for (let i = 0; i < motion.lrcData.length; i++) {
+                    const line = motion.lrcData[i];
+                    // 毫秒 → 秒用于比较
+                    if (targetTime >= line.time / 1000) {
+                        currentLineStart = line.time / 1000;
                     }
                 }
 
