@@ -879,11 +879,10 @@ func qrc2lrc(qrcXML string) string {
 	return result.String()
 }
 
-// msToTimeStr 将毫秒转换为 LRC 时间格式 [mm:ss.xx]
+// msToTimeStr 将毫秒转换为 LRC 时间格式 [mm:ss.xxx]
 func msToTimeStr(ms int) string {
-	totalMs := ms
-	minutes := totalMs / 60000
-	seconds := (totalMs % 60000) / 1000
-	centiseconds := (totalMs % 1000) / 10
-	return fmt.Sprintf("%02d:%02d.%02d", minutes, seconds, centiseconds)
+	minutes := ms / 60000
+	seconds := (ms % 60000) / 1000
+	milliseconds := ms % 1000
+	return fmt.Sprintf("%02d:%02d.%03d", minutes, seconds, milliseconds)
 }

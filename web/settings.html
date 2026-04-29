@@ -721,15 +721,19 @@
                   <option value="800">特粗</option>
                 </select>
               </div>
-            </div>
-            <div class="form-item" style="margin-top: 12px;">
-              <label>字体</label>
-              <div style="font-size: 12px; margin-bottom: 8px;">拉丁字体</div>
-              <select id="pv-fontFamilyLatin"></select>
-              <div style="font-size: 12px; margin: 12px 0 8px;">中日韩字体</div>
-              <select id="pv-fontFamilyCJK"></select>
-              <div id="pv-fontPreview" style="margin-top: 8px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 4px; font-size: 24px; text-align: center;">
-                サンプルテキスト Sample
+              <div class="form-item">
+                <label>西文字体</label>
+                <select id="pv-fontFamilyLatin"></select>
+                </div>
+              <div class="form-item">
+                <label>中日韩字体</label>
+                <select id="pv-fontFamilyCJK"></select>
+              </div>
+              <div class="form-item" style="grid-column: 1 / -1;">
+                <label>预览</label>
+                <div id="pv-fontPreview" style="margin-top: 8px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 4px; font-size: 24px; text-align: center;">
+                    Hello 歌词 サンプルテキスト
+                </div>
               </div>
             </div>
           </div>
@@ -826,7 +830,7 @@
                 <label>西文字体</label>
                 <select id="scroll-fontFamilyLatin"></select>
               </div>
-<div class="form-item">
+              <div class="form-item">
                  <label>中日韩字体</label>
                  <select id="scroll-fontFamilyCJK"></select>
                </div>
