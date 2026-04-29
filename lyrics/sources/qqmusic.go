@@ -859,7 +859,7 @@ func qrc2lrc(qrcXML string) string {
 			continue
 		}
 
-		wordMatches := wordRe.FindAllStringSubmatch(line, -1)
+		wordMatches := wordRe.FindAllStringSubmatch(lineMatch[3], -1)
 		if wordMatches == nil {
 			continue
 		}
