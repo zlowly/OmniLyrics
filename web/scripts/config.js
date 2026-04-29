@@ -15,7 +15,7 @@ const SETTINGS_DEFAULT_CONFIG = {
     },
     font: {
         size: '2.4rem',
-        family: 'system-ui, -apple-system, Arial'
+        family: 'Arial, Microsoft YaHei'
     },
     bg: {
         color: '#000000'
@@ -42,6 +42,25 @@ const SETTINGS_DEFAULT_CONFIG = {
             wordAnimation: true,
             animationDuration: 0.3,
             currentScale: 1.05
+        },
+        pv: {
+            template: 'pop_center',
+            canvasSize: { width: 1280, height: 720 },
+            showNextLine: true,
+            baseFontSize: '48px',
+            fontFamily: 'Noto Sans JP, Hiragino Kaku Gothic ProN, Yu Gothic, sans-serif',
+            fontWeight: 700,
+            colors: {
+                text: '#f0f0f0',
+                fill: '#ffde6e',
+                nextText: '#cccccc',
+                nextFill: '#aaaaaa'
+            },
+            effects: {
+                glowRange: 0,
+                outlineWidth: 0,
+                outlineColor: '#000000'
+            }
         }
     }
 };

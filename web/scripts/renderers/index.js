@@ -70,6 +70,9 @@ class RendererManager {
             case 'blur':
                 this.currentRenderer = new window.BlurRenderer(this.container, this.stage, this.config);
                 break;
+            case 'pv':
+                this.currentRenderer = new window.PVRenderer(this.container, this.stage, this.config);
+                break;
             case 'karaoke':
             default:
                 this.currentRenderer = new window.KaraokeRenderer(this.container, this.stage, this.config);

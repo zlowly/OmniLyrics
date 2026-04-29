@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>日式PV字幕动画 - 最小雏形 | 透明背景 + GSAP</title>
+    <!-- 引入 GSAP 核心库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none; /* 避免拖动文字，纯展示效果 */
+        }
+
+        /* 整个页面背景：深灰色棋盘格，用于凸显透明字幕层（实际字幕层背景完全透明）*/
+        body {
+            background: repeating-conic-gradient(#2a2a2a 0% 25%, #1e1e1e 0% 50%) 50% / 20px 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Segoe UI', sans-serif;
+        }
+
+        /* 模拟第三方应用的“透明画布容器”：固定尺寸，背景透明 */
+        .pv-canvas {
+            position: relative;
+            width: 1280px;
+            height: 720px;
+            background: transparent;   /* 完全透明，供第三方叠加 */
+            box-shadow: 0 0 0 2px rgba(255,255,255,0.2); /* 仅调试边框，可移除 */
+            overflow: hidden;
+        }
+
+        /* 字幕层容器：透明，绝对定位覆盖画布 */
+        .subtitle-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            pointer-events: none;      /* 让点击穿透，方便第三方操作 */
+        }
+
+        /* 标准居中布局的行容器 (flex) */
+        .subtitle-line {
+            position: absolute;
+            bottom: 12%;               /* 距离底部12% 日式PV常用位置 */
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: center;
+            align-items: baseline;
+            flex-wrap: nowrap;
+            gap: 0.08em;              /* 字间距细微透气 */
+            white-space: nowrap;
+            font-size: clamp(32px, 6vw, 72px);
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+            /* 背景完全透明，无底框 */
+            background: transparent;
+        }
+
+        /* 每个字符的包裹容器，用于动画及填充层定位 */
+        .char {
+            position: relative;
+            display: inline-block;
+            transform-origin: center center;
+            will-change: transform, opacity;
+            /* 让填充层绝对定位相对于字符 */
+        }
+
+        .char-text {
+            display: block;
+            position: relative;
+            color: #f0f0f0;          /* 主文字浅色，日式常见 */
+            transition: color 0.1s ease;
+            /* 文字描边增加可读性 */
+            text-shadow: 0px 0px 2px #000, 1px 1px 0 #000;
+        }
+
+        /* 卡拉OK填充层：覆盖在文字上方，通过 scaleX 控制宽度 */
+        .char-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffde6e;       /* 亮黄色填充，日式高亮色 */
+            transform-origin: left center;
+            transform: scaleX(0);
+            /* 混合模式让填充更有质感，且不影响透明背景 */
+            mix-blend-mode: overlay;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* 下一行预览样式（半透明小字） */
+        .subtitle-line.next-line {
+            bottom: 4%;
+            font-size: 0.55em;
+            opacity: 0.45;
+            filter: blur(0.4px);
+            text-shadow: none;
+        }
+        .subtitle-line.next-line .char-text {
+            color: #cccccc;
+            text-shadow: 0 0 1px black;
+        }
+        .subtitle-line.next-line .char-fill {
+            background: #aaa;
+            mix-blend-mode: normal;
+            opacity: 0.6;
+        }
+
+        /* 控制按钮区域（仅演示用） */
+        .demo-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 16px;
+            border-radius: 40px;
+            display: flex;
+            gap: 12px;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            font-family: monospace;
+        }
+        button {
+            background: #ffaa44;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        button:hover {
+            background: #ffcc66;
+            transform: scale(0.96);
+        }
+        .time-info {
+            color: white;
+            font-size: 14px;
+            background: #000000aa;
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="pv-canvas" id="pvCanvas">
+    <div class="subtitle-layer" id="subtitleLayer"></div>
+</div>
+<div class="demo-controls">
+    <button id="playBtn">▶ 播放</button>
+    <button id="pauseBtn">⏸ 暂停</button>
+    <button id="resetBtn">↺ 重置</button>
+    <div class="time-info" id="timeDisplay">0.00 / 0.00</div>
+</div>
+
+<script>
+    // ======================== 1. 模拟歌词数据（逐字时间戳） ========================
+    // 这是示例数据，实际可从外部JSON加载。每行独立，但为了演示，我们构造一句副歌加后续一句
+    // 注意：时间戳需按顺序全局递增，展示完整流程
+    const lyricsData = [
+        // 第一句 (lineId = 0)
+        { text: "君", start: 0.12, end: 0.28, lineId: 0 },
+        { text: "が", start: 0.28, end: 0.41, lineId: 0 },
+        { text: "好", start: 0.41, end: 0.63, lineId: 0 },
+        { text: "き", start: 0.63, end: 0.80, lineId: 0 },
+        { text: "だ", start: 0.80, end: 1.00, lineId: 0 },
+        // 第二句 (lineId = 1) 副歌部分
+        { text: "眩", start: 1.20, end: 1.42, lineId: 1 },
+        { text: "し", start: 1.42, end: 1.55, lineId: 1 },
+        { text: "い", start: 1.55, end: 1.75, lineId: 1 },
+        { text: "朝", start: 1.75, end: 2.05, lineId: 1 },
+        { text: "に", start: 2.05, end: 2.20, lineId: 1 },
+        // 第三句 (lineId=2) 带长音
+        { text: "約", start: 2.50, end: 2.75, lineId: 2 },
+        { text: "束", start: 2.75, end: 3.00, lineId: 2 },
+        { text: "の", start: 3.00, end: 3.18, lineId: 2 },
+        { text: "花", start: 3.18, end: 3.50, lineId: 2 },
+        { text: "を", start: 3.50, end: 3.70, lineId: 2 },
+        { text: "咲", start: 3.70, end: 4.00, lineId: 2 },
+        { text: "か", start: 4.00, end: 4.15, lineId: 2 },
+        { text: "せ", start: 4.15, end: 4.35, lineId: 2 },
+        { text: "よ", start: 4.35, end: 4.80, lineId: 2 }
+    ];
+
+    // 画布尺寸（应与 .pv-canvas 实际尺寸一致，这里使用固定1280x720）
+    const canvasWidth = 1280;
+    const canvasHeight = 720;
+
+    // 全局 GSAP 时间线及状态
+    let mainTimeline = null;
+    let currentTime = 0;
+    let animationProgress = false;
+
+    // DOM 元素
+    const subtitleLayer = document.getElementById('subtitleLayer');
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const timeDisplay = document.getElementById('timeDisplay');
+
+    // ======================== 2. 辅助：将歌词按句子分组 ========================
+    function groupWordsByLine(words) {
+        const lines = new Map(); // lineId -> array of words
+        words.forEach(word => {
+            const lineId = word.lineId !== undefined ? word.lineId : 0;
+            if (!lines.has(lineId)) lines.set(lineId, []);
+            lines.get(lineId).push(word);
+        });
+        // 按 lineId 排序后返回数组
+        return Array.from(lines.entries()).sort((a,b) => a[0] - b[0]).map(entry => entry[1]);
+    }
+
+    // ======================== 3. 构建 DOM 结构（居中布局） ========================
+    function buildDOM(wordsGrouped) {
+        subtitleLayer.innerHTML = ''; // 清空
+        const lineElements = [];
+        // 为每个句子创建 div.subtitle-line
+        wordsGrouped.forEach((lineWords, idx) => {
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'subtitle-line';
+            if (idx === 1) lineDiv.classList.add('next-line'); // 演示第二句作为预显示（实际可根据时间切换，此处简化：仅演示第二句小字效果）
+            // 但为了动态显示“当前句”和“下一句”,我们需要稍后在时间线中动态class切换, 本demo先全部创建但控制可见性?
+            // 为简单，我们先让所有行一开始存在，通过时间线动态改变样式/显示? 更优雅: 仅创建当前和未来一行。但为了完整动画，创建所有行但控制显示时机。
+            // 这里为展示多行切换能力，构建所有行，后续动画根据时间整行显隐。
+            lineDiv.setAttribute('data-line-idx', idx);
+            lineWords.forEach((word, wIdx) => {
+                const charSpan = document.createElement('span');
+                charSpan.className = 'char';
+                charSpan.setAttribute('data-char-idx', `${idx}_${wIdx}`);
+                // 文字层
+                const textSpan = document.createElement('span');
+                textSpan.className = 'char-text';
+                textSpan.textContent = word.text;
+                // 填充层
+                const fillSpan = document.createElement('span');
+                fillSpan.className = 'char-fill';
+                charSpan.appendChild(textSpan);
+                charSpan.appendChild(fillSpan);
+                lineDiv.appendChild(charSpan);
+            });
+            subtitleLayer.appendChild(lineDiv);
+            lineElements.push(lineDiv);
+        });
+        // 初始隐藏所有行（除了第一行？建议全部隐藏，由时间线控制出现时机）
+        lineElements.forEach(line => {
+            line.style.opacity = '0';
+            line.style.visibility = 'hidden';
+        });
+        return lineElements;
+    }
+
+    // ======================== 4. 构建 GSAP Timeline（核心：逐字入场 + 卡拉OK填充）================
+    function buildTimeline(wordsFlat, wordsGrouped, lineDivs) {
+        const tl = gsap.timeline({ paused: true, onUpdate: updateTimeDisplay });
+        // 记录每个句子的开始和结束时间（用于整行显隐）
+        const lineTimeRanges = wordsGrouped.map(lineWords => ({
+            start: lineWords[0].start,
+            end: lineWords[lineWords.length-1].end
+        }));
+
+        // --- 步骤1：按句子开始时间显示整行容器（淡入 + 轻微缩放）, 以及下一行预览效果 ---
+        wordsGrouped.forEach((lineWords, lineIdx) => {
+            const lineStart = lineTimeRanges[lineIdx].start;
+            const lineEnd = lineTimeRanges[lineIdx].end;
+            const lineDiv = lineDivs[lineIdx];
+            // 在句子开始时显示行（且移除下一行样式，如果有多个行逻辑，这里简化：当前行正常字，下一行小字类动态添加）
+            tl.set(lineDiv, { visibility: 'visible', opacity: 0, scale: 0.96 }, lineStart);
+            tl.to(lineDiv, { opacity: 1, scale: 1, duration: 0.12, ease: "power2.out" }, lineStart);
+            // 在句子末尾淡出隐藏（可选，避免重叠）
+            tl.to(lineDiv, { opacity: 0, duration: 0.1, ease: "power1.in" }, lineEnd);
+            tl.set(lineDiv, { visibility: 'hidden' }, lineEnd + 0.05);
+        });
+
+        // 额外处理“下一句预览”：在显示当前行时，将下一行（若存在）设置为半透明小字预览样式，且不移位
+        for (let i = 0; i < wordsGrouped.length - 1; i++) {
+            const currentLineEnd = lineTimeRanges[i].end;
+            const nextLineDiv = lineDivs[i+1];
+            // 在当前行结束后提前 0.2 秒显示下一行小字预览
+            tl.set(nextLineDiv, { visibility: 'visible', opacity: 0.4, scale: 0.85 }, currentLineEnd - 0.2);
+            tl.to(nextLineDiv, { opacity: 0.55, duration: 0.2 }, currentLineEnd - 0.2);
+            // 并在下一句真正开始时恢复正常样式（将覆盖之前的 set）
+            const nextLineStart = lineTimeRanges[i+1].start;
+            tl.to(nextLineDiv, { opacity: 1, scale: 1, duration: 0.15, clearProps: "all" }, nextLineStart);
+        }
+
+        // --- 步骤2：逐字动画（缩放弹跳入场 + 卡拉OK填充）---
+        wordsFlat.forEach((word, idx) => {
+            // 定位对应的DOM元素（通过 lineId 和 行内索引）
+            const lineIdx = word.lineId;
+            const lineDiv = lineDivs[lineIdx];
+            if (!lineDiv) return;
+            const charElements = lineDiv.querySelectorAll('.char');
+            // 在该行内找到对应顺序的字符（假设数据顺序与构建顺序一致）
+            const wordsInLine = wordsGrouped[lineIdx];
+            const charIndexInLine = wordsInLine.findIndex(w => w === word);
+            if (charIndexInLine === -1 || charIndexInLine >= charElements.length) return;
+            const charEl = charElements[charIndexInLine];
+            const fillEl = charEl.querySelector('.char-fill');
+
+            // 入场动画：从下方弹跳 + 缩放
+            tl.fromTo(charEl, 
+                { y: 18, scale: 0.6, opacity: 0 },
+                { y: 0, scale: 1, opacity: 1, duration: 0.12, ease: "back.out(0.7)" },
+                word.start
+            );
+            // 填充动画（卡拉OK高亮）：使用填充层的 scaleX
+            if (fillEl) {
+                tl.fromTo(fillEl,
+                    { scaleX: 0 },
+                    { scaleX: 1, duration: word.end - word.start, ease: "linear" },
+                    word.start
+                );
+            }
+            // 可选退场动画：在 end 前一点点缩小消失（增加自然感）
+            tl.to(charEl, { scale: 0.7, opacity: 0, duration: 0.08, ease: "power2.in" }, word.end - 0.05);
+        });
+
+        // 简单增加一个结束后的复位
+        tl.call(() => {
+            console.log("动画播放完成");
+        });
+        return tl;
+    }
+
+    // 辅助：显示当前时间
+    function updateTimeDisplay() {
+        if (mainTimeline) {
+            const t = mainTimeline.time();
+            const dur = mainTimeline.duration();
+            timeDisplay.textContent = `${t.toFixed(2)} / ${dur.toFixed(2)}`;
+        }
+    }
+
+    // ======================== 5. 初始化并启动 ========================
+    function init() {
+        // 按句子分组
+        const wordsGrouped = groupWordsByLine(lyricsData);
+        const lineDivs = buildDOM(wordsGrouped);
+        // 构建时间线（传入平面数组、分组、行元素）
+        mainTimeline = buildTimeline(lyricsData, wordsGrouped, lineDivs);
+        // 可选：添加更新回调
+        mainTimeline.eventCallback("onUpdate", () => {
+            currentTime = mainTimeline.time();
+        });
+        // 默认重置到开始
+        mainTimeline.pause();
+        mainTimeline.progress(0);
+        updateTimeDisplay();
+    }
+
+    // 控制函数
+    function playAnim() {
+        if (mainTimeline) mainTimeline.play();
+    }
+    function pauseAnim() {
+        if (mainTimeline) mainTimeline.pause();
+    }
+    function resetAnim() {
+        if (mainTimeline) {
+            mainTimeline.pause();
+            mainTimeline.progress(0);
+            updateTimeDisplay();
+        }
+    }
+
+    // 监听按钮
+    playBtn.addEventListener('click', playAnim);
+    pauseBtn.addEventListener('click', pauseAnim);
+    resetBtn.addEventListener('click', resetAnim);
+
+    // 启动
+    init();
+    // 自动播放一次方便预览（可选）
+    setTimeout(() => playAnim(), 200);
+</script>
+</body>
+</html>

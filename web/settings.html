@@ -582,6 +582,7 @@
             <option value="karaoke">单行卡拉OK</option>
             <option value="scroll">双行滚动</option>
             <option value="blur">多行渐变模糊</option>
+            <option value="pv">日式PV字幕</option>
           </select>
         </div>
         <div class="sidebar-section-title">展示模式</div>
@@ -596,6 +597,10 @@
         <div class="side-option" data-panel="mode-blur">
           <input type="radio" name="display-mode" value="blur">
           多行渐变模糊
+        </div>
+        <div class="side-option" data-panel="mode-pv">
+          <input type="radio" name="display-mode" value="pv">
+          日式PV字幕
         </div>
       </div>
       <div class="content">
@@ -663,8 +668,8 @@
                    color: #fff;
                    text-shadow: 0 0 10px rgba(0,255,255,0.8);
                  ">Hello World 歌词预览</div>
-               </div>
-             </div>
+</div>
+        </div>
           </div>
           <div class="card">
             <div class="card-title">动画参数</div>
@@ -684,6 +689,91 @@
                 <label>当前字缩放</label>
                 <input type="number" id="currentScale" value="1.05" step="0.01" min="1" max="2">
               </div>
+            </div>
+          </div>
+        </div>
+        <div class="content-card" data-panel="mode-pv">
+          <div class="card">
+            <div class="card-title">PV模板</div>
+            <div class="form-item">
+              <label>选择模板</label>
+              <select id="pv-template">
+                <option value="pop_center">弹跳居中</option>
+                <option value="fast_scatter">快速散射</option>
+                <option value="cardStack">卡片堆叠</option>
+              </select>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">基础设置</div>
+            <div class="form-grid">
+              <div class="form-item">
+                <label>字号</label>
+                <input type="text" id="pv-fontSize" value="48px">
+              </div>
+              <div class="form-item">
+                <label>字重</label>
+                <select id="pv-fontWeight">
+                  <option value="400">细体</option>
+                  <option value="500">中等</option>
+                  <option value="600">半粗</option>
+                  <option value="700" selected>粗体</option>
+                  <option value="800">特粗</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-item" style="margin-top: 12px;">
+              <label>字体</label>
+              <div style="font-size: 12px; margin-bottom: 8px;">拉丁字体</div>
+              <select id="pv-fontFamilyLatin"></select>
+              <div style="font-size: 12px; margin: 12px 0 8px;">中日韩字体</div>
+              <select id="pv-fontFamilyCJK"></select>
+              <div id="pv-fontPreview" style="margin-top: 8px; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 4px; font-size: 24px; text-align: center;">
+                サンプルテキスト Sample
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">颜色设置</div>
+            <div class="form-grid">
+              <div class="form-item">
+                <label>文字颜色</label>
+                <input type="color" id="pv-textColor" value="#f0f0f0">
+              </div>
+              <div class="form-item">
+                <label>填充颜色</label>
+                <input type="color" id="pv-fillColor" value="#ffde6e">
+              </div>
+            </div>
+            <div class="form-grid" style="margin-top: 12px;">
+              <div class="form-item">
+                <label>下一句文字</label>
+                <input type="color" id="pv-nextTextColor" value="#cccccc">
+              </div>
+              <div class="form-item">
+                <label>下一句填充</label>
+                <input type="color" id="pv-nextFillColor" value="#aaaaaa">
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">显示设置</div>
+            <div class="form-grid">
+              <div class="form-item">
+                <label>画布宽度</label>
+                <input type="number" id="pv-canvasWidth" value="1280" min="640" max="3840">
+              </div>
+              <div class="form-item">
+                <label>画布高度</label>
+                <input type="number" id="pv-canvasHeight" value="720" min="360" max="2160">
+              </div>
+            </div>
+            <div class="switch-wrapper" style="margin-top: 12px;">
+              <span class="switch-label">显示下一句预览</span>
+              <label class="switch">
+                <input type="checkbox" id="pv-showNextLine" checked>
+                <span class="switch-slider"></span>
+              </label>
             </div>
           </div>
         </div>
@@ -931,7 +1021,7 @@ const LYRICS_DEFAULT = {
     const RENDERER_DEFAULT = {
       mode: 'karaoke',
       colors: { text: '#ffffff', bg: '#000000', glowRange: 1, outlineWidth: 1, outlineColor: '#ffffff' },
-      font: { size: '2.4rem', weight: 'normal' },
+      font: { size: '2.4rem', weight: 'normal', family: 'Arial, Microsoft YaHei' },
       modeParams: {
         karaoke: { wordAnimation: true, animationDuration: 0.3, currentScale: 1.05 },
         scroll: { 
@@ -940,7 +1030,7 @@ const LYRICS_DEFAULT = {
           currentScale: 1.05,
           alignOffset: 0,
           colors: { text: '#ffffff', bg: '#000000', glowRange: 1, outlineWidth: 1, outlineColor: '#ffffff' },
-          font: { size: '2.4rem', weight: 'normal' }
+          font: { size: '2.4rem', weight: 'normal', family: 'Arial, Microsoft YaHei' }
         },
         blur: { 
           visibleLines: 9, 
@@ -953,7 +1043,26 @@ const LYRICS_DEFAULT = {
           animationDuration: 0.3,
           currentScale: 1.05,
           colors: { text: '#ffffff', bg: '#000000', glowRange: 1, outlineWidth: 1, outlineColor: '#ffffff' },
-          font: { size: '2.4rem', weight: 'normal' }
+          font: { size: '2.4rem', weight: 'normal', family: 'Arial, Microsoft YaHei' }
+        },
+        pv: {
+          template: 'pop_center',
+          canvasSize: { width: 1280, height: 720 },
+          showNextLine: true,
+          baseFontSize: '48px',
+          fontFamily: 'Noto Sans JP, Hiragino Kaku Gothic ProN, Yu Gothic, sans-serif',
+          fontWeight: 700,
+          colors: {
+            text: '#f0f0f0',
+            fill: '#ffde6e',
+            nextText: '#cccccc',
+            nextFill: '#aaaaaa'
+          },
+          effects: {
+            glowRange: 0,
+            outlineWidth: 0,
+            outlineColor: '#000000'
+          }
         }
       }
     };
@@ -1056,9 +1165,27 @@ const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.
         document.getElementById('blur-animationDuration').value = blur.animationDuration;
         document.getElementById('blur-currentScale').value = blur.currentScale;
 
+        // PV 配置
+        const pv = rendererConfig.modeParams?.pv || RENDERER_DEFAULT.modeParams.pv;
+        document.getElementById('pv-template').value = pv.template || 'pop_center';
+        document.getElementById('pv-canvasWidth').value = pv.canvasSize?.width || 1280;
+        document.getElementById('pv-canvasHeight').value = pv.canvasSize?.height || 720;
+        document.getElementById('pv-showNextLine').checked = pv.showNextLine !== false;
+        document.getElementById('pv-fontSize').value = pv.baseFontSize || '48px';
+        document.getElementById('pv-fontWeight').value = pv.fontWeight || '700';
+        if (pv.colors) {
+          document.getElementById('pv-textColor').value = (pv.colors.text || '#f0f0f0').slice(0, 7);
+          document.getElementById('pv-fillColor').value = (pv.colors.fill || '#ffde6e').slice(0, 7);
+          document.getElementById('pv-nextTextColor').value = (pv.colors.nextText || '#cccccc').slice(0, 7);
+          document.getElementById('pv-nextFillColor').value = (pv.colors.nextFill || '#aaaaaa').slice(0, 7);
+        }
         // 更新预览（在所有颜色值加载完成后）
         updateScrollFontPreview();
         updateBlurFontPreview();
+        updatePVFontPreview();
+
+        // 同步侧边栏和内容卡片到当前模式
+        updateDisplayModeSidebar(currentMode);
      }
 
     // 加载系统字体列表
@@ -1075,6 +1202,8 @@ const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.
         const scrollCjkSelect = document.getElementById('scroll-fontFamilyCJK');
         const blurLatinSelect = document.getElementById('blur-fontFamilyLatin');
         const blurCjkSelect = document.getElementById('blur-fontFamilyCJK');
+        const pvLatinSelect = document.getElementById('pv-fontFamilyLatin');
+        const pvCjkSelect = document.getElementById('pv-fontFamilyCJK');
 
         const cjkKeywords = ['YaHei', 'Hei', 'Song', 'Kai', 'Ming', 'Fang', 'SC', 'TC', 'CN', 'JP', 'KR', 'Noto', 'WenQuanYi', 'Droid', 'Source Han', 'PingFang', 'Hiragino'];
 
@@ -1093,6 +1222,9 @@ const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.
           const optBlur1 = opt1.cloneNode(true);
           blurLatinSelect.appendChild(optBlur1);
 
+          const optPv1 = opt1.cloneNode(true);
+          if (pvLatinSelect) pvLatinSelect.appendChild(optPv1);
+
           if (isCJK) {
             const opt2 = document.createElement('option');
             opt2.value = name;
@@ -1104,6 +1236,9 @@ const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.
 
             const optBlur2 = opt2.cloneNode(true);
             blurCjkSelect.appendChild(optBlur2);
+
+            const optPv2 = opt2.cloneNode(true);
+            if (pvCjkSelect) pvCjkSelect.appendChild(optPv2);
           }
         });
 
@@ -1127,6 +1262,12 @@ const scroll = rendererConfig.modeParams?.scroll || RENDERER_DEFAULT.modeParams.
         const blurParts = blurFontFamily.split(',').map(f => f.trim());
         blurLatinSelect.value = blurParts[0] || latin;
         blurCjkSelect.value = blurParts[1] || cjk;
+
+        // 设置选中值 - pv
+        const pvFontFamily = rendererConfig.modeParams?.pv?.fontFamily || 'Noto Sans JP, Hiragino Kaku Gothic ProN, Yu Gothic, sans-serif';
+        const pvParts = pvFontFamily.split(',').map(f => f.trim());
+        if (pvLatinSelect) pvLatinSelect.value = pvParts[0] || 'Noto Sans JP';
+        if (pvCjkSelect) pvCjkSelect.value = pvParts[1] || 'Hiragino Kaku Gothic ProN';
       } catch (e) {
         console.warn('[Fonts] Load failed:', e);
       }
@@ -1356,6 +1497,9 @@ function renderRulesList(rules) {
       const blurLatinFont = document.getElementById('blur-fontFamilyLatin').value;
       const blurCjkFont = document.getElementById('blur-fontFamilyCJK').value;
 
+      const pvLatinFont = document.getElementById('pv-fontFamilyLatin')?.value || 'Noto Sans JP';
+      const pvCjkFont = document.getElementById('pv-fontFamilyCJK')?.value || 'Hiragino Kaku Gothic ProN';
+
       return {
         mode: document.getElementById('currentDisplayMode').value,
         colors: {
@@ -1415,6 +1559,23 @@ function renderRulesList(rules) {
               size: document.getElementById('blur-fontSize').value,
               weight: document.getElementById('blur-fontWeight').value,
               family: `${blurLatinFont}, ${blurCjkFont}`
+            }
+          },
+          pv: {
+            template: document.getElementById('pv-template').value,
+            canvasSize: {
+              width: parseInt(document.getElementById('pv-canvasWidth').value),
+              height: parseInt(document.getElementById('pv-canvasHeight').value)
+            },
+            showNextLine: document.getElementById('pv-showNextLine').checked,
+            baseFontSize: document.getElementById('pv-fontSize').value,
+            fontFamily: `${pvLatinFont}, ${pvCjkFont}`,
+            fontWeight: document.getElementById('pv-fontWeight').value,
+            colors: {
+              text: document.getElementById('pv-textColor').value,
+              fill: document.getElementById('pv-fillColor').value,
+              nextText: document.getElementById('pv-nextTextColor').value,
+              nextFill: document.getElementById('pv-nextFillColor').value
             }
           }
         }
@@ -1593,6 +1754,35 @@ function renderRulesList(rules) {
     document.getElementById('blur-outlineColor').addEventListener('input', updateBlurFontPreview);
     document.getElementById('blur-fontSize').addEventListener('input', updateBlurFontPreview);
     document.getElementById('blur-fontWeight').addEventListener('change', updateBlurFontPreview);
+
+    // PV 字体预览更新函数
+    function updatePVFontPreview() {
+      const latinFont = document.getElementById('pv-fontFamilyLatin')?.value || 'Noto Sans JP';
+      const cjkFont = document.getElementById('pv-fontFamilyCJK')?.value || 'Hiragino Kaku Gothic ProN';
+      const textColor = document.getElementById('pv-textColor')?.value || '#f0f0f0';
+      const fontSize = document.getElementById('pv-fontSize')?.value || '48px';
+      const fontWeight = document.getElementById('pv-fontWeight')?.value || '700';
+
+      const preview = document.getElementById('pv-fontPreview');
+      if (preview) {
+        preview.style.fontFamily = `"${latinFont}", "${cjkFont}", sans-serif`;
+        preview.style.color = textColor;
+        preview.style.fontSize = fontSize;
+        preview.style.fontWeight = fontWeight;
+      }
+    }
+
+    // PV 配置事件监听
+    document.getElementById('pv-fontFamilyLatin')?.addEventListener('change', updatePVFontPreview);
+    document.getElementById('pv-fontFamilyCJK')?.addEventListener('change', updatePVFontPreview);
+    document.getElementById('pv-textColor')?.addEventListener('input', updatePVFontPreview);
+    document.getElementById('pv-fillColor')?.addEventListener('input', updatePVFontPreview);
+    document.getElementById('pv-nextTextColor')?.addEventListener('input', updatePVFontPreview);
+    document.getElementById('pv-nextFillColor')?.addEventListener('input', updatePVFontPreview);
+    document.getElementById('pv-fontSize')?.addEventListener('input', updatePVFontPreview);
+    document.getElementById('pv-fontWeight')?.addEventListener('change', updatePVFontPreview);
+
+    updatePVFontPreview();
 
     // 保存
     document.getElementById('saveBtn').addEventListener('click', async () => {

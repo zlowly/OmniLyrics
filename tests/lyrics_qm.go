@@ -1,5 +1,5 @@
 // tests/lyrics_qm.go
-// 单文件实现 QQ音乐歌词获取
+// QQ音乐歌词获取（精简版）
 // Usage: go run ./tests/lyrics_qm.go "歌手名" "歌名" [时长秒]
 
 package main
@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -21,10 +20,18 @@ import (
 	"time"
 )
 
-// ==================== QRC 解密相关 ====================
+// ==================== 3DES 解密（保留已验证的自定义实现）====================
 
 var QRC_KEY = []byte("!@#)(*$%123ZXC!@!@#)(NHL") // 24字节密钥
 
+// 预计算的 3DES 解密密钥调度（解密模式，共3组，每组16轮6整数）
+var desSchedule [][][]int
+
+func init() {
+	desSchedule = tripledesKeySetup(QRC_KEY, DECRYPT)
+}
+
+// sbox 定义（完整）
 var sbox = [8][64]int{
 	{
 		14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7,
@@ -76,10 +83,7 @@ var sbox = [8][64]int{
 	},
 }
 
-const (
-	ENCRYPT = 1
-	DECRYPT = 0
-)
+const DECRYPT = 0
 
 func bitNum(a []byte, b int, c int) int {
 	return int((a[(b/32)*4+3-(b%32)/8]>>(7-b%8))&1) << c
@@ -289,7 +293,7 @@ func keySchedule(key []byte, mode int) [][]int {
 		d = ((d << keyRndShift[i]) | (d >> (28 - keyRndShift[i]))) & 0xfffffff0
 
 		togen := 15 - i
-		if mode == ENCRYPT {
+		if mode == 1 { // ENCRYPT
 			togen = i
 		}
 
@@ -310,17 +314,17 @@ func keySchedule(key []byte, mode int) [][]int {
 }
 
 func tripledesKeySetup(key []byte, mode int) [][][]int {
-	if mode == ENCRYPT {
+	if mode == 1 { // ENCRYPT
 		return [][][]int{
-			keySchedule(key[0:8], ENCRYPT),
-			keySchedule(key[8:16], DECRYPT),
-			keySchedule(key[16:24], ENCRYPT),
+			keySchedule(key[0:8], 1),
+			keySchedule(key[8:16], 0),
+			keySchedule(key[16:24], 1),
 		}
 	}
 	return [][][]int{
-		keySchedule(key[16:24], DECRYPT),
-		keySchedule(key[8:16], ENCRYPT),
-		keySchedule(key[0:8], DECRYPT),
+		keySchedule(key[16:24], 0),
+		keySchedule(key[8:16], 1),
+		keySchedule(key[0:8], 0),
 	}
 }
 
@@ -350,46 +354,32 @@ func qrcDecrypt(encryptedQrc string) (string, error) {
 	if encryptedQrc == "" {
 		return "", nil
 	}
-
-	encryptedTextByte, err := hex.DecodeString(encryptedQrc)
+	ciphertext, err := hex.DecodeString(encryptedQrc)
 	if err != nil {
 		return "", err
 	}
-
-	schedule := tripledesKeySetup(QRC_KEY, DECRYPT)
-	data := tripledes3Crypt(encryptedTextByte, schedule)
-
-	r, err := zlib.NewReader(bytes.NewReader(data))
+	decrypted := tripledes3Crypt(ciphertext, desSchedule)
+	r, err := zlib.NewReader(bytes.NewReader(decrypted))
 	if err != nil {
 		return "", err
 	}
 	defer r.Close()
-
 	output, err := io.ReadAll(r)
-	if err != nil {
-		return "", err
-	}
-	return string(output), nil
+	return string(output), err
 }
 
-// ==================== QQ音乐客户端（未修改）====================
+// ==================== QQ音乐客户端 ====================
 
 type SongInfo struct {
 	ID       int64
-	Mid      string
 	Title    string
 	Singer   string
-	Album    string
-	Duration int
+	Duration int // 毫秒
 }
 
 type QMCloud struct {
 	client *http.Client
 	comm   map[string]interface{}
-	inited bool
-	uid    string
-	sid    string
-	userip string
 }
 
 func newQMCloud() *QMCloud {
@@ -409,57 +399,7 @@ func newQMCloud() *QMCloud {
 	}
 }
 
-func (q *QMCloud) initSession() error {
-	payload := map[string]interface{}{
-		"comm": q.comm,
-		"request": map[string]interface{}{
-			"method": "GetSession",
-			"module": "music.getSession.session",
-			"param": map[string]interface{}{
-				"caller": 0,
-				"uid":    "0",
-				"vkey":   0,
-			},
-		},
-	}
-	b, _ := json.Marshal(payload)
-	resp, err := q.client.Post("https://u.y.qq.com/cgi-bin/musicu.fcg", "application/json", strings.NewReader(string(b)))
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("GetSession 请求失败: %s", resp.Status)
-	}
-	var data map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return err
-	}
-	if code, ok := data["code"].(float64); ok && code == 0 {
-		if req, ok := data["request"].(map[string]interface{}); ok {
-			if d, ok := req["data"].(map[string]interface{}); ok {
-				if uid, ok := d["uid"].(string); ok {
-					q.uid = uid
-				}
-				if sid, ok := d["sid"].(string); ok {
-					q.sid = sid
-				}
-				if userip, ok := d["userip"].(string); ok {
-					q.userip = userip
-				}
-			}
-		}
-	}
-	q.inited = true
-	return nil
-}
-
-func (q *QMCloud) request(method string, module string, param map[string]interface{}) (map[string]interface{}, error) {
-	if !q.inited && method != "GetSession" {
-		if err := q.initSession(); err != nil {
-			return nil, err
-		}
-	}
+func (q *QMCloud) request(method, module string, param map[string]interface{}) (map[string]interface{}, error) {
 	payload := map[string]interface{}{
 		"comm": q.comm,
 		"request": map[string]interface{}{
@@ -468,32 +408,23 @@ func (q *QMCloud) request(method string, module string, param map[string]interfa
 			"param":  param,
 		},
 	}
-	b, _ := json.Marshal(payload)
-
-	// 调试：打印请求信息
-	reqBody := string(b)
-	fmt.Fprintf(os.Stderr, "\n=== HTTP 请求 ===\nURL: https://u.y.qq.com/cgi-bin/musicu.fcg\nMethod: %s, Module: %s\nBody: %s\n\n", method, module, reqBody)
-
-	resp, err := q.client.Post("https://u.y.qq.com/cgi-bin/musicu.fcg", "application/json", strings.NewReader(string(b)))
+	bodyBytes, _ := json.Marshal(payload)
+	resp, err := q.client.Post("https://u.y.qq.com/cgi-bin/musicu.fcg", "application/json", strings.NewReader(string(bodyBytes)))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("歌词请求失败: %s", resp.Status)
+		return nil, fmt.Errorf("请求失败: %s", resp.Status)
 	}
 	body, _ := io.ReadAll(resp.Body)
-
-	// 调试：打印响应信息
-	fmt.Fprintf(os.Stderr, "=== HTTP 响应 ===\nStatus: %s\nBody[:1000]: %s\n\n", resp.Status, string(body[:min(1000, len(body))]))
-
 	var res map[string]interface{}
-	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&res); err != nil {
+	if err := json.Unmarshal(body, &res); err != nil {
 		return nil, err
 	}
 	if req, ok := res["request"].(map[string]interface{}); ok {
-		if d, ok := req["data"].(map[string]interface{}); ok {
-			return d, nil
+		if data, ok := req["data"].(map[string]interface{}); ok {
+			return data, nil
 		}
 	}
 	return res, nil
@@ -501,27 +432,22 @@ func (q *QMCloud) request(method string, module string, param map[string]interfa
 
 func (q *QMCloud) GetLyricsForSong(info SongInfo) (string, error) {
 	if info.ID == 0 {
-		return "", fmt.Errorf("歌曲ID为空，无法请求歌词")
+		return "", fmt.Errorf("歌曲ID为空")
 	}
-	albumName := base64.StdEncoding.EncodeToString([]byte(info.Album))
-	singerName := base64.StdEncoding.EncodeToString([]byte(info.Singer))
-	songName := base64.StdEncoding.EncodeToString([]byte(info.Title))
-	interval := int(info.Duration / 1000)
-
 	param := map[string]interface{}{
-		"albumName":  albumName,
+		"albumName":  base64.StdEncoding.EncodeToString([]byte("")),
 		"crypt":      1,
 		"ct":         19,
 		"cv":         2111,
-		"interval":   interval,
+		"interval":   info.Duration / 1000,
 		"lrc_t":      0,
 		"qrc":        1,
 		"qrc_t":      0,
 		"roma":       1,
 		"roma_t":     0,
-		"singerName": singerName,
-		"songID":     int64(info.ID),
-		"songName":   songName,
+		"singerName": base64.StdEncoding.EncodeToString([]byte(info.Singer)),
+		"songID":     info.ID,
+		"songName":   base64.StdEncoding.EncodeToString([]byte(info.Title)),
 		"trans":      1,
 		"trans_t":    0,
 		"type":       0,
@@ -530,102 +456,92 @@ func (q *QMCloud) GetLyricsForSong(info SongInfo) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if v, ok := resp["orig"].(string); ok && strings.TrimSpace(v) != "" {
-		lyric := v
-		lyric = decryptLyricIfPossible(lyric)
-		return lyric, nil
-	}
-	if v, ok := resp["lyric"].(string); ok && strings.TrimSpace(v) != "" {
-		lyric := v
-		lyric = decryptLyricIfPossible(lyric)
-		return lyric, nil
+	for _, field := range []string{"orig", "lyric"} {
+		if v, ok := resp[field].(string); ok && strings.TrimSpace(v) != "" {
+			return decryptLyric(v), nil
+		}
 	}
 	if d, ok := resp["data"].(map[string]interface{}); ok {
 		if v, ok := d["lyric"].(string); ok && strings.TrimSpace(v) != "" {
-			lyric := v
-			lyric = decryptLyricIfPossible(lyric)
-			return lyric, nil
+			return decryptLyric(v), nil
 		}
 	}
 	return "", fmt.Errorf("未获取到歌词文本")
 }
 
-func decryptLyricIfPossible(s string) string {
+func decryptLyric(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return s
 	}
-	result, err := qrcDecrypt(s)
-	if err != nil {
-		// 解密失败，返回原始字符串（可能是未加密的 LRC）
-		return s
+	if result, err := qrcDecrypt(s); err == nil {
+		return result
 	}
-	return result
+	return s
 }
 
-// qrc2lrc 将 QRC 格式歌词转换为逐字 LRC 格式。
-func qrc2lrc(qrcXML string) string {
-	startMarker := `LyricContent="`
-	endMarker := `"/>`
+// ==================== QRC 转 LRC ====================
 
-	startIdx := strings.Index(qrcXML, startMarker)
-	if startIdx < 0 {
+var (
+	lineRe = regexp.MustCompile(`^\[(\d+),(\d+)\](.*)$`)
+	wordRe = regexp.MustCompile(`([^\(]*)\((\d+),(\d+)\)`)
+)
+
+func qrc2lrc(qrcXML string) string {
+	start := strings.Index(qrcXML, `LyricContent="`)
+	if start < 0 {
 		return qrcXML
 	}
-	startIdx += len(startMarker)
-	endIdx := strings.Index(qrcXML[startIdx:], endMarker)
-	if endIdx < 0 {
+	start += len(`LyricContent="`)
+	end := strings.Index(qrcXML[start:], `"/>`)
+	if end < 0 {
 		return qrcXML
 	}
-	content := qrcXML[startIdx : startIdx+endIdx]
+	content := qrcXML[start : start+end]
 	lines := strings.Split(content, "\n")
 
-	lineRe := regexp.MustCompile(`^\[(\d+),(\d+)\](.*)$`)
-	wordRe := regexp.MustCompile(`([^\(]*)\((\d+),(\d+)\)`)
-
-	var result strings.Builder
-	for _, rawLine := range lines {
-		line := strings.TrimSpace(rawLine)
+	var out strings.Builder
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		lineMatch := lineRe.FindStringSubmatch(line)
-		if lineMatch == nil {
+		parts := lineRe.FindStringSubmatch(line)
+		if parts == nil {
 			continue
 		}
-		lineStart, _ := strconv.Atoi(lineMatch[1])
-		lineContent := lineMatch[3]
+		lineStart, _ := strconv.Atoi(parts[1])
+		lineContent := parts[3]
 
-		wordMatches := wordRe.FindAllStringSubmatch(lineContent, -1)
-		if wordMatches == nil {
-			result.WriteString(fmt.Sprintf("[%s]%s\n", msToTimeStr(lineStart), lineContent))
+		words := wordRe.FindAllStringSubmatch(lineContent, -1)
+		if words == nil {
+			out.WriteString(fmt.Sprintf("[%s]%s\n", msToTimeStr(lineStart), lineContent))
 			continue
 		}
-		for i, wm := range wordMatches {
-			wordContent := wm[1]
-			wordOffset, _ := strconv.Atoi(wm[2])
-			wordDuration, _ := strconv.Atoi(wm[3])
-			result.WriteString(fmt.Sprintf("[%s]%s", msToTimeStr(wordOffset), wordContent))
-			if i == len(wordMatches)-1 {
-				result.WriteString(fmt.Sprintf("[%s]", msToTimeStr(wordOffset+wordDuration)))
+		for i, w := range words {
+			text := w[1]
+			offset, _ := strconv.Atoi(w[2])
+			dur, _ := strconv.Atoi(w[3])
+			out.WriteString(fmt.Sprintf("[%s]%s", msToTimeStr(offset), text))
+			if i == len(words)-1 {
+				out.WriteString(fmt.Sprintf("[%s]", msToTimeStr(offset+dur)))
 			}
 		}
-		result.WriteString("\n")
+		out.WriteString("\n")
 	}
-	return result.String()
+	return out.String()
 }
 
 func msToTimeStr(ms int) string {
-	minutes := ms / 60000
-	seconds := (ms % 60000) / 1000
-	milliseconds := ms % 1000
-	return fmt.Sprintf("%02d:%02d.%03d", minutes, seconds, milliseconds)
+	return fmt.Sprintf("%02d:%02d.%03d", ms/60000, (ms%60000)/1000, ms%1000)
 }
 
+// ==================== 搜索歌曲 ====================
+
 func searchSongs(client *http.Client, comm map[string]interface{}, artist, title string) ([]SongInfo, error) {
-	q := strings.TrimSpace(artist + " " + title)
-	if q == "" {
-		return nil, fmt.Errorf("无效的查询关键词")
+	query := strings.TrimSpace(artist + " " + title)
+	if query == "" {
+		return nil, fmt.Errorf("无效查询词")
 	}
 	payload := map[string]interface{}{
 		"comm": comm,
@@ -633,63 +549,51 @@ func searchSongs(client *http.Client, comm map[string]interface{}, artist, title
 			"method": "DoSearchForQQMusicLite",
 			"module": "music.search.SearchCgiService",
 			"param": map[string]interface{}{
-				"remoteplace":  "search.android.keyboard",
-				"query":        q,
+				"query":        query,
 				"search_type":  0,
 				"num_per_page": 20,
 				"page_num":     1,
-				"highlight":    0,
-				"nqc_flag":     0,
-				"page_id":      1,
-				"grp":          1,
 			},
 		},
 	}
-	b, _ := json.Marshal(payload)
-	resp, err := client.Post("https://u.y.qq.com/cgi-bin/musicu.fcg", "application/json", strings.NewReader(string(b)))
+	body, _ := json.Marshal(payload)
+	resp, err := client.Post("https://u.y.qq.com/cgi-bin/musicu.fcg", "application/json", strings.NewReader(string(body)))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("搜索请求失败: %s", resp.Status)
+		return nil, fmt.Errorf("搜索失败: %s", resp.Status)
 	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
+	data, _ := io.ReadAll(resp.Body)
 	var jsonData map[string]interface{}
-	if err := json.Unmarshal(body, &jsonData); err != nil {
+	if err := json.Unmarshal(data, &jsonData); err != nil {
 		return nil, err
 	}
 	var results []SongInfo
-	if reqData, ok := jsonData["request"].(map[string]interface{}); ok {
-		if respData, ok := reqData["data"].(map[string]interface{}); ok {
-			if bodyData, ok := respData["body"].(map[string]interface{}); ok {
-				if itemSong, ok := bodyData["item_song"].([]interface{}); ok {
-					for _, item := range itemSong {
+	if req, ok := jsonData["request"].(map[string]interface{}); ok {
+		if respData, ok := req["data"].(map[string]interface{}); ok {
+			if body, ok := respData["body"].(map[string]interface{}); ok {
+				if items, ok := body["item_song"].([]interface{}); ok {
+					for _, item := range items {
 						if m, ok := item.(map[string]interface{}); ok {
-							s := SongInfo{Mid: stringFrom(m["mid"]), Title: stringFrom(m["title"])}
-							if v, ok := m["id"]; ok {
-								if idVal, ok := toInt(v); ok {
-									s.ID = int64(idVal)
-								}
+							s := SongInfo{Title: getString(m["title"])}
+							if id, ok := toInt64(m["id"]); ok {
+								s.ID = id
 							}
-							if singerList, ok := m["singer"].([]interface{}); ok {
+							if singers, ok := m["singer"].([]interface{}); ok {
 								var names []string
-								for _, si := range singerList {
-									if siMap, ok := si.(map[string]interface{}); ok {
-										if name, ok := siMap["name"].(string); ok && name != "" {
+								for _, si := range singers {
+									if sim, ok := si.(map[string]interface{}); ok {
+										if name := getString(sim["name"]); name != "" {
 											names = append(names, name)
 										}
 									}
 								}
 								s.Singer = strings.Join(names, ", ")
 							}
-							if v, ok := m["interval"]; ok {
-								if dur, ok := toInt(v); ok {
-									s.Duration = dur * 1000
-								}
+							if dur, ok := toInt(m["interval"]); ok {
+								s.Duration = dur * 1000
 							}
 							results = append(results, s)
 						}
@@ -701,7 +605,7 @@ func searchSongs(client *http.Client, comm map[string]interface{}, artist, title
 	return results, nil
 }
 
-func stringFrom(v interface{}) string {
+func getString(v interface{}) string {
 	if s, ok := v.(string); ok {
 		return s
 	}
@@ -721,72 +625,71 @@ func toInt(v interface{}) (int, bool) {
 	}
 }
 
+func toInt64(v interface{}) (int64, bool) {
+	switch t := v.(type) {
+	case int:
+		return int64(t), true
+	case int64:
+		return t, true
+	case float64:
+		return int64(t), true
+	default:
+		return 0, false
+	}
+}
+
+// ==================== main ====================
+
 func main() {
-	if len(os.Args) != 3 && len(os.Args) != 4 {
-		fmt.Println("Usage: go run ./tests/lyrics_qm.go \"<歌手名>\" \"<歌名>\" [时长秒]")
-		fmt.Println("Example: go run ./tests/lyrics_qm.go \"周杰伦\" \"稻香\"")
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: go run ./tests/lyrics_qm.go \"歌手\" \"歌名\" [时长秒]")
 		os.Exit(2)
 	}
-
-	artist := os.Args[1]
-	title := os.Args[2]
-
+	artist, title := os.Args[1], os.Args[2]
 	durationSec := 0
 	if len(os.Args) == 4 {
-		if v, err := strconv.Atoi(os.Args[3]); err == nil {
-			durationSec = v
-		}
+		durationSec, _ = strconv.Atoi(os.Args[3])
 	}
 
 	cloud := newQMCloud()
-	if err := cloud.initSession(); err != nil {
-		log.Fatalf("初始化会话失败: %v", err)
-	}
-
-	results, err := searchSongs(cloud.client, cloud.comm, artist, title)
+	songs, err := searchSongs(cloud.client, cloud.comm, artist, title)
 	if err != nil {
-		log.Fatalf("搜索失败: %v", err)
+		fmt.Fprintln(os.Stderr, "搜索失败:", err)
+		os.Exit(1)
 	}
-
-	fmt.Printf("找到 %d 首歌曲\n\n", len(results))
-	for i, s := range results {
-		songDuration := s.Duration / 1000
-		fmt.Printf("[%d] ID: %d, Mid: %s, Title: %s, Singer: %s, Duration: %d s\n",
-			i+1, s.ID, s.Mid, s.Title, s.Singer, songDuration)
-	}
-
-	if len(results) == 0 {
-		fmt.Println("没有找到歌曲")
+	if len(songs) == 0 {
+		fmt.Println("未找到歌曲")
 		return
 	}
+	fmt.Printf("找到 %d 首歌曲\n", len(songs))
+	for i, s := range songs {
+		fmt.Printf("[%d] ID:%d %s - %s (%ds)\n", i+1, s.ID, s.Title, s.Singer, s.Duration/1000)
+	}
 
-	song := results[0]
+	selected := songs[0]
 	if durationSec > 0 {
-		bestIdx := 0
-		bestDiff := 999999
-		for i, s := range results {
-			d := s.Duration / 1000
-			diff := d - durationSec
-			if diff < 0 {
-				diff = -diff
-			}
+		bestIdx, bestDiff := 0, 999999
+		for i, s := range songs {
+			diff := abs(s.Duration/1000 - durationSec)
 			if diff < bestDiff {
-				bestDiff = diff
-				bestIdx = i
+				bestDiff, bestIdx = diff, i
 			}
 		}
-		song = results[bestIdx]
-		fmt.Printf("\n选择匹配歌曲: [%d] ID: %d, Duration: %d s\n",
-			bestIdx+1, song.ID, song.Duration/1000)
+		selected = songs[bestIdx]
+		fmt.Printf("选择歌曲: %s - %s (%ds)\n", selected.Title, selected.Singer, selected.Duration/1000)
 	}
 
-	lyric, err := cloud.GetLyricsForSong(song)
+	lyric, err := cloud.GetLyricsForSong(selected)
 	if err != nil {
-		log.Fatalf("获取歌词失败: %v", err)
+		fmt.Fprintln(os.Stderr, "获取歌词失败:", err)
+		os.Exit(1)
 	}
+	fmt.Println("\nLRC歌词:\n" + qrc2lrc(lyric))
+}
 
-	lrcLyric := qrc2lrc(lyric)
-
-	fmt.Println("\nLRC 歌词内容:")
-	fmt.Println(lrcLyric)
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
