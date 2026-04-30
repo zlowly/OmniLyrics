@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"embed"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +13,10 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
+
+// 嵌入 config_default.json 到二进制文件中
+//go:embed config_default.json
+var defaultConfigFS embed.FS
 
 // Config 定义应用程序的配置结构。
 type Config struct {
@@ -32,18 +38,15 @@ var config *Config
 
 // initFlags 初始化命令行参数。
 // 使用 pflag 替代标准库的 flag，支持更丰富的命令行参数风格。
+// 注意：默认值已通过 viper.SetDefault() 从 config_default.json 注入。
 func initFlags() {
-	// 端口参数
-	pflag.StringP("port", "p", "8081", "HTTP server port")
-	// 日志参数
-	pflag.StringP("log-level", "l", "info", "Log level (debug, info, warn, error)")
+	// 定义命令行参数（无默认值，由 viper 从嵌入的 config_default.json 提供）
+	pflag.StringP("port", "p", "", "HTTP server port")
+	pflag.StringP("log-level", "l", "", "Log level (debug, info, warn, error)")
 	pflag.String("log-file", "", "Log file path (empty for stdout)")
-	// 目录参数
-	pflag.String("cache-dir", "", "Cache directory path (default: ./Cache)")
-	pflag.String("config-dir", "", "Config directory path (default: ./Config)")
-	// 配置文件参数
-	pflag.StringP("config", "c", "", "Config file path (default: config.json in executable directory)")
-	// SMTC 模式参数
+	pflag.String("cache-dir", "", "Cache directory path")
+	pflag.String("config-dir", "", "Config directory path")
+	pflag.StringP("config", "c", "", "Config file path")
 	pflag.Bool("mock", false, "Force use mock SMTC backend")
 
 	// 将 pflag 绑定到 viper
@@ -54,10 +57,27 @@ func initFlags() {
 }
 
 // loadConfig 加载配置。
-// 优先级（从高到低）：命令行参数 > 配置文件 > 默认值
+// 优先级（从高到低）：命令行参数 > -c 指定的配置文件 > config.json > config_default.json（嵌入的默认值）
 // 配置文件默认命名为 config.json，放在基础目录（当前工作目录或可执行文件目录）。
 func loadConfig() (*Config, error) {
-	// 设置配置文件目录为基础目录（当前工作目录优先）
+	// 第一步：加载嵌入的 config_default.json 作为基础默认值
+	defaultData, err := defaultConfigFS.ReadFile("config_default.json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read embedded default config: %w", err)
+	}
+
+	// 解析默认值 JSON
+	var defaultValues map[string]interface{}
+	if err := json.Unmarshal(defaultData, &defaultValues); err != nil {
+		return nil, fmt.Errorf("failed to parse default config: %w", err)
+	}
+
+	// 将嵌入的默认值注入到 viper（这会成为最低优先级）
+	for key, value := range defaultValues {
+		viper.SetDefault(key, value)
+	}
+
+	// 第二步：设置配置文件目录为基础目录（当前工作目录优先）
 	baseDir := getBaseDir()
 	viper.AddConfigPath(baseDir)
 
@@ -73,7 +93,7 @@ func loadConfig() (*Config, error) {
 		}
 	}
 
-	// 如果命令行指定了配置文件路径，则额外读取该文件
+	// 第三步：如果命令行指定了配置文件路径，则额外读取该文件
 	if configPath := viper.GetString("config"); configPath != "" {
 		viper.SetConfigFile(configPath)
 		if err := viper.ReadInConfig(); err != nil {
@@ -81,42 +101,22 @@ func loadConfig() (*Config, error) {
 		}
 	}
 
-	// 解析配置到结构体
+	// 第四步：解析配置到结构体
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// 命令行参数优先级最高，如果被设置则覆盖配置文件的值
-	if pflag.CommandLine.Changed("port") {
-		cfg.Port = viper.GetString("port")
-	}
+	// 第五步：处理命令行参数对嵌套配置的覆盖
+	// viper 无法自动将 "log-level" 映射到 "log.level"，需要手动处理
 	if pflag.CommandLine.Changed("log-level") {
 		cfg.Log.Level = viper.GetString("log-level")
 	}
 	if pflag.CommandLine.Changed("log-file") {
 		cfg.Log.File = viper.GetString("log-file")
 	}
-	if pflag.CommandLine.Changed("cache-dir") {
-		cfg.CacheDir = viper.GetString("cache-dir")
-	}
-	if pflag.CommandLine.Changed("config-dir") {
-		cfg.ConfigDir = viper.GetString("config-dir")
-	}
-	if pflag.CommandLine.Changed("mock") {
-		cfg.Mock = viper.GetBool("mock")
-	}
 
-	// 处理相对路径：相对于当前工作目录
-	// 如果配置值为空，使用默认值
-	if cfg.CacheDir == "" {
-		cfg.CacheDir = "Cache"
-	}
-	if cfg.ConfigDir == "" {
-		cfg.ConfigDir = "Config"
-	}
-
-	// 如果是相对路径，转换为绝对路径（相对于当前工作目录）
+	// 第六步：处理相对路径：相对于当前工作目录
 	if !filepath.IsAbs(cfg.CacheDir) {
 		cfg.CacheDir = filepath.Join(getBaseDir(), cfg.CacheDir)
 	}
@@ -200,44 +200,29 @@ func initConfig() error {
 // GetPort 返回配置的端口。
 // @return string 端口号
 func GetPort() string {
-	if config == nil {
-		return "8081"
-	}
 	return config.Port
 }
 
 // GetCacheDir 返回配置的缓存目录。
 // @return string 缓存目录路径
 func GetCacheDir() string {
-	if config == nil {
-		return "Cache"
-	}
 	return config.CacheDir
 }
 
 // GetConfigDir 返回配置的配置目录。
 // @return string 配置目录路径
 func GetConfigDir() string {
-	if config == nil {
-		return "Config"
-	}
 	return config.ConfigDir
 }
 
 // GetMock 返回是否强制使用 Mock SMTC 后端。
 // @return bool 是否强制使用 mock
 func GetMock() bool {
-	if config == nil {
-		return false
-	}
 	return config.Mock
 }
 
 // GetLogLevel 返回日志级别字符串。
 // @return string 日志级别 ("debug", "info", "warn", "error")
 func GetLogLevel() string {
-	if config == nil {
-		return "info"
-	}
 	return config.Log.Level
 }

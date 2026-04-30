@@ -182,6 +182,8 @@ OmniLyrics
 
 ## 5. 展示模式规格
 
+**注意**：以下所有展示模式的默认参数值均来源于 `config_default.json` 文件（通过 `//go:embed` 嵌入到二进制文件中），不再使用代码中的硬编码默认值。
+
 ### 5.1 单行卡拉OK (karaoke)
 
 逐字高亮发光效果，当前字有缩放动画。
@@ -268,6 +270,7 @@ OmniLyrics/
 ├── main.go                    # Go 后端入口
 ├── handlers.go               # HTTP 处理器
 ├── config.go               # 配置系统
+├── config_default.json      # 默认配置值（嵌入到二进制）
 ├── decrypter.go            # QRC 解密
 ├── handler.go             # /decrypt 接口
 ├── smtc/

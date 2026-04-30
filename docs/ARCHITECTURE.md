@@ -159,19 +159,21 @@ type LyricsSource interface {
 
 配置优先级（从高到低）：
 1. 命令行参数
-2. 配置文件 (config.json)
-3. 默认值
+2. 配置文件 (通过 `-c` 指定的文件或 `config.json`)
+3. `config_default.json`（嵌入到二进制文件的默认值）
+
+**默认值来源**：所有默认值已集中在 `config_default.json` 文件中，通过 `//go:embed` 嵌入到二进制文件，不再使用代码中的硬编码默认值。
 
 **配置项**：
 
-| 参数 | 命令行 | 配置文件 | 默认值 | 说明 |
-|------|--------|----------|--------|------|
-| 端口 | -p | port | 8081 | HTTP 服务端口 |
-| 日志级别 | -l | log.level | info | debug/info/warn/error |
-| 日志文件 | --log-file | log.file | 空(stdout) | 日志输出文件 |
-| 缓存目录 | --cache-dir | cache-dir | ./Cache | 歌词缓存目录 |
-| 配置目录 | --config-dir | config-dir | ./Config | 配置文件目录 |
-| Mock 模式 | --mock | mock | false | 强制使用 Mock SMTC（调试用) |
+| 参数 | 命令行 | 配置文件 | 默认值来源 | 说明 |
+|------|--------|----------|------------|------|
+| 端口 | -p | port | config_default.json | HTTP 服务端口 |
+| 日志级别 | -l | log.level | config_default.json | debug/info/warn/error |
+| 日志文件 | --log-file | log.file | config_default.json | 日志输出文件 |
+| 缓存目录 | --cache-dir | cache-dir | config_default.json | 歌词缓存目录 |
+| 配置目录 | --config-dir | config-dir | config_default.json | 配置文件目录 |
+| Mock 模式 | --mock | mock | config_default.json | 强制使用 Mock SMTC（调试用) |
 
 ### 3.2 前端模块
 

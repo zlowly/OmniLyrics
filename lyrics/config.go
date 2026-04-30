@@ -26,24 +26,6 @@ type LyricsConfig struct {
 	Rules   []MatchRule `json:"rules"`   // 匹配规则列表
 }
 
-// defaultConfig 返回默认歌词配置。
-func defaultConfig() *LyricsConfig {
-	return &LyricsConfig{
-		Timeout: 5000,
-		Retry:   1,
-		Rules: []MatchRule{
-			{
-				AppName: "",
-				Sources: []RuleSource{
-					{Name: "lrclib", Enabled: true, Priority: 1},
-					{Name: "qqmusic", Enabled: true, Priority: 2},
-					{Name: "kgmusic", Enabled: true, Priority: 3},
-				},
-			},
-		},
-	}
-}
-
 // LoadConfig 从配置文件加载歌词源配置。
 // 如果配置文件不存在，返回默认配置。
 // 参数：
@@ -68,7 +50,21 @@ func LoadConfig(configDir string) (*LyricsConfig, error) {
 		return &cfg, nil
 	}
 
-	return defaultConfig(), nil
+	// 返回默认配置（与 config_default.json 中的 lyrics 部分保持一致）
+	return &LyricsConfig{
+		Timeout: 5000,
+		Retry:   1,
+		Rules: []MatchRule{
+			{
+				AppName: "",
+				Sources: []RuleSource{
+					{Name: "lrclib", Enabled: true, Priority: 1},
+					{Name: "qqmusic", Enabled: true, Priority: 2},
+					{Name: "kgmusic", Enabled: true, Priority: 3},
+				},
+			},
+		},
+	}, nil
 }
 
 // SaveConfig 保存歌词源配置到配置文件。

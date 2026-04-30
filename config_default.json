@@ -1,0 +1,74 @@
+{
+  "port": "8081",
+  "log": {
+    "level": "info",
+    "file": ""
+  },
+  "cache-dir": "Cache",
+  "config-dir": "Config",
+  "mock": false,
+  "lyrics": {
+    "timeout": 5000,
+    "retry": 1,
+    "rules": [
+      {
+        "appName": "",
+        "sources": [
+          {
+            "name": "lrclib",
+            "enabled": true,
+            "priority": 1
+          },
+          {
+            "name": "qqmusic",
+            "enabled": true,
+            "priority": 2
+          },
+          {
+            "name": "kgmusic",
+            "enabled": true,
+            "priority": 3
+          }
+        ]
+      }
+    ]
+  },
+  "renderer": {
+    "mode": "karaoke",
+    "colors": {
+      "text": "#ffffff",
+      "bg": "#000000",
+      "glowRange": 1,
+      "outlineWidth": 1,
+      "outlineColor": "#ffffff"
+    },
+    "font": {
+      "size": "2.4rem",
+      "family": "system-ui, -apple-system, Arial"
+    },
+    "bg": {
+      "color": "#000000"
+    },
+    "modeParams": {
+      "karaoke": {
+        "wordAnimation": true,
+        "animationDuration": 0.3,
+        "currentScale": 1.05
+      },
+      "scroll": {
+        "showNext": true,
+        "nextOpacity": 0.6,
+        "scrollDuration": 0.4
+      },
+      "blur": {
+        "visibleLines": 9,
+        "lineSpacing": 1.5,
+        "opacityDecay": 0.15,
+        "blurIncrement": 0.5,
+        "scaleDecay": 0.1,
+        "blurMax": 6,
+        "scrollSpeed": "linear"
+      }
+    }
+  }
+}

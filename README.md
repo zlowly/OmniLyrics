@@ -66,6 +66,33 @@ body {
 - **歌词源设置**：配置搜索源优先级、超时、适用App
 - **展示设置**：选择模式、颜色、字体、动画参数
 
+### 配置系统
+
+使用 viper + pflag 管理配置，所有默认值集中在 `config_default.json` 文件中（嵌入到二进制文件）。
+
+**配置优先级**（从高到低）：
+1. 命令行参数（`--port`, `--log-level` 等）
+2. `config.json` 文件（项目根目录或执行文件同目录）
+3. `config_default.json`（嵌入的默认值）
+
+**常用参数**：
+```bash
+# 指定端口
+go run . --port 8080
+
+# 指定日志级别（debug/info/warn/error）
+go run . --log-level debug
+
+# 启用 Mock 后端（非 Windows 开发测试）
+go run . --mock
+
+# 自定义缓存目录
+go run . --cache-dir /path/to/cache
+
+# 加载特定配置文件
+go run . --config /path/to/config.json
+```
+
 ## 常见问题
 
 ### Q: 歌词不显示

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"embed"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,10 @@ import (
 	"github.com/zlowly/OmniLyrics/logger"
 	"github.com/zlowly/OmniLyrics/smtc"
 )
+
+// 嵌入 config_default.json 用于获取默认的渲染器和歌词配置
+//go:embed config_default.json
+var defaultConfigData embed.FS
 
 // holdFrozen 标记是否冻结状态（暂停获取新数据）
 var holdFrozen bool
@@ -344,46 +349,28 @@ func handleConfig(w http.ResponseWriter, r *http.Request, configDir string) {
 			// 直接返回文件内容（保持原格式）
 			w.Write(content)
 		} else {
-			// 文件不存在，返回默认配置
-			defaultConfig := map[string]interface{}{
-				"mode": "karaoke",
-				"colors": map[string]interface{}{
-					"text":          "#ffffff",
-					"bg":            "#000000",
-					"glowRange":     1,
-					"outlineWidth":  1,
-					"outlineColor": "#ffffff",
-				},
-				"font": map[string]interface{}{
-					"size":   "2.4rem",
-					"family": "system-ui, -apple-system, Arial",
-				},
-				"bg": map[string]interface{}{
-					"color": "#000000",
-				},
-				"modeParams": map[string]interface{}{
-					"karaoke": map[string]interface{}{
-						"wordAnimation":     true,
-						"animationDuration": 0.3,
-						"currentScale":      1.05,
-					},
-					"scroll": map[string]interface{}{
-						"showNext":      true,
-						"nextOpacity":   0.6,
-						"scrollDuration": 0.4,
-					},
-					"blur": map[string]interface{}{
-						"visibleLines":  9,
-						"lineSpacing":   1.5,
-						"opacityDecay":  0.15,
-						"blurIncrement": 0.5,
-						"scaleDecay":    0.1,
-						"blurMax":       6,
-						"scrollSpeed":   "linear",
-					},
-				},
+			// 文件不存在，从嵌入的 config_default.json 读取 renderer 部分
+			defaultData, err := defaultConfigData.ReadFile("config_default.json")
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read default config"})
+				return
 			}
-			json.NewEncoder(w).Encode(defaultConfig)
+
+			var fullConfig map[string]interface{}
+			if err := json.Unmarshal(defaultData, &fullConfig); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Failed to parse default config"})
+				return
+			}
+
+			// 提取 renderer 部分
+			if renderer, ok := fullConfig["renderer"]; ok {
+				json.NewEncoder(w).Encode(renderer)
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "renderer config not found in defaults"})
+			}
 		}
 		return
 	}
@@ -442,22 +429,29 @@ func handleLyricsConfig(w http.ResponseWriter, r *http.Request, configDir string
 			}
 			w.Write(content)
 		} else {
-			// 文件不存在，返回默认配置
-			defaultConfig := map[string]interface{}{
-				"timeout": 5000,
-				"retry":   1,
-				"rules": []map[string]interface{}{
-					{
-						"appName": "",
-						"sources": []map[string]interface{}{
-							{"name": "lrclib", "enabled": true, "priority": 1},
-							{"name": "qqmusic", "enabled": true, "priority": 2},
-							{"name": "kgmusic", "enabled": true, "priority": 3},
-						},
-					},
-				},
+			// 文件不存在，返回嵌入默认配置中的 lyrics 部分
+			defaultData, err := defaultConfigData.ReadFile("config_default.json")
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Failed to read default config"})
+				return
 			}
-			json.NewEncoder(w).Encode(defaultConfig)
+
+			var fullConfig map[string]interface{}
+			if err := json.Unmarshal(defaultData, &fullConfig); err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Failed to parse default config"})
+				return
+			}
+
+			// 提取 lyrics 部分
+			if lyrics, ok := fullConfig["lyrics"]; ok {
+				json.NewEncoder(w).Encode(lyrics)
+		} else {
+			// 降级处理：config_default.json 中缺少 lyrics 字段
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{"error": "lyrics config not found in defaults"})
+		}
 		}
 		return
 	}

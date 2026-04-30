@@ -81,16 +81,28 @@
       --log-file string     日志文件路径 (默认: 输出到 stdout)
       --cache-dir string    缓存目录 (默认: "./Cache")
       --config-dir string   配置目录 (默认: "./Config")
-  -c, --config string      配置文件路径 (默认: "config.json")
+  -c, --config string       配置文件路径 (默认: "config.json")
       --mock                强制使用 Mock SMTC 后端
 ```
 
-### 1.4 配置优先级
+### 1.4 配置优先级与默认值来源
 
-优先级从高到低：
-1. 命令行参数
-2. 配置文件 (通过 `-c` 指定的文件或 `config.json`)
-3. 默认值
+配置优先级从高到低：
+
+1. **命令行参数** - 优先级最高
+   - 示例：`go run . --port 8080 -l debug`
+
+2. **--config 指定的配置文件** - 如果使用 `-c` 参数
+   - 示例：`go run . --config /path/to/custom.json`
+
+3. **config.json** - 项目根目录或执行文件所在目录的配置文件
+   - 如果存在则读取，不存在则跳过
+
+4. **config_default.json** - 嵌入到二进制文件的默认配置（优先级最低）
+   - 所有默认值来源于此文件
+   - 随二进制文件分发，无需外部文件
+
+**注意**：所有默认值现已集中在 `config_default.json` 文件中，不再使用代码中的硬编码默认值。
 
 ## 2. 渲染器配置
 
