@@ -57,10 +57,10 @@ function parseLRCInternal(lrcText) {
         const cleanText = text.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '').trim();
 
         if (words.length > 1) {
-            lines.push({ time: lineTimeMs, text: cleanText, words: words });
+            lines.push({ time: lineTimeMs, text: cleanText, words: words, isInterlude: detectInterludeText(cleanText) });
         } else if (cleanText) {
             // 普通行
-            lines.push({ time: lineTimeMs, text: cleanText });
+            lines.push({ time: lineTimeMs, text: cleanText, isInterlude: detectInterludeText(cleanText) });
         }
     }
 
@@ -86,6 +86,12 @@ function cleanLRCInternal(lrc) {
     let cleaned = lrc;
     noisePatterns.forEach(p => { cleaned = cleaned.replace(p, ''); });
     return cleaned;
+}
+
+// 判断是否为间奏行（独立函数，可在解析时预计算缓存）
+function detectInterludeText(text) {
+    const interludeKeywords = ['间奏', '器乐', 'instrumental', 'interlude', '空白', '...'];
+    return interludeKeywords.some(k => text.toLowerCase().includes(k.toLowerCase()));
 }
 
 class MotionEngine {
@@ -268,9 +274,14 @@ class MotionEngine {
     }
 
     startRenderLoop() {
+        let frameCount = 0;
         const loop = () => {
-            this.computeFrameData();
-            this.onFrame?.(this.frameData);
+            frameCount++;
+            // 每 3 帧处理一次（~20fps），GSAP 内部 ticker 驱动动画，外部只需足够频率检测换行和状态变化
+            if (frameCount % 3 === 0) {
+                this.computeFrameData();
+                this.onFrame?.(this.frameData);
+            }
             requestAnimationFrame(loop);
         };
         requestAnimationFrame(loop);
@@ -285,14 +296,17 @@ class MotionEngine {
             return;
         }
 
-        let idx = 0;
-        for (let i = 0; i < lines.length - 1; i++) {
-            if (pos >= lines[i].time && pos < lines[i + 1].time) {
-                idx = i;
-                break;
+        // 二分搜索当前行（歌词已按 time 排序）
+        let lo = 0, hi = lines.length - 1;
+        while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (lines[mid].time <= pos) {
+                lo = mid;
+            } else {
+                hi = mid - 1;
             }
-            if (pos >= lines[lines.length - 1].time) idx = lines.length - 1;
         }
+        const idx = lo;
 
         const curr = lines[idx];
         const next = lines[idx + 1];
@@ -300,8 +314,8 @@ class MotionEngine {
         const elapsed = pos - curr.time;
         const progress = Math.max(0, Math.min(1, elapsed / duration));
 
-        const isInterlude = this.detectInterlude(curr.text);
-        const countdown = isInterlude ? Math.max(0, Math.ceil((curr.time - pos) / 1000)) : 0;
+        // 使用预计算的 interlude 状态，避免每帧字符串匹配
+        const isInterlude = curr.isInterlude !== undefined ? curr.isInterlude : this.detectInterlude(curr.text);
 
         const deltaPos = pos - (this._prevPosition || pos);
         this.velocity = Math.abs(deltaPos);

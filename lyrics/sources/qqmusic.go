@@ -487,7 +487,7 @@ type songSearchResult struct {
 func (s *QQMusicSource) Search(ctx context.Context, title, artist string, duration int) (string, error) {
 	// 步骤1：搜索歌曲获取候选列表（包含时长信息）
 	candidates := s.searchSongs(ctx, title, artist)
-	if candidates == nil || len(candidates) == 0 {
+	if len(candidates) == 0 {
 		return "", nil // 未找到歌曲
 	}
 
@@ -499,12 +499,12 @@ func (s *QQMusicSource) Search(ctx context.Context, title, artist string, durati
 		// 保持向后兼容：如果没有提供时长，使用第一个结果
 		result = candidates[0]
 	}
-	
+
 	if result == nil {
 		return "", nil // 未找到歌曲
 	}
 
-	logger.Infof("[QQMusic] 找到歌曲: songID=%d, songMid=%s, duration=%ds (目标: %ds)", 
+	logger.Infof("[QQMusic] 找到歌曲: songID=%d, songMid=%s, duration=%ds (目标: %ds)",
 		result.SongID, result.SongMid, result.Duration, duration)
 
 	// 步骤3：获取加密歌词（使用新的API）
@@ -535,33 +535,33 @@ func (s *QQMusicSource) searchSongs(ctx context.Context, title, artist string) [
 	// 构造请求数据，使用 DoSearchForQQMusicLite 方法
 	searchData := map[string]interface{}{
 		"comm": map[string]interface{}{
-			"ct":       11,
-			"cv":       "1003006",
-			"v":        "1003006",
-			"os_ver":   "15",
+			"ct":        11,
+			"cv":        "1003006",
+			"v":         "1003006",
+			"os_ver":    "15",
 			"phonetype": "24122RKC7C",
-			"rom":      "Redmi/miro/miro:15/AE3A.240806.005/OS2.0.105.0.VOMCNXM:user/release-keys",
-			"tmeAppID": "qqmusiclight",
-			"nettype":  "NETWORK_WIFI",
-			"udid":     "0",
-			"uid":      "0",
-			"sid":      "",
-			"userip":   "",
+			"rom":       "Redmi/miro/miro:15/AE3A.240806.005/OS2.0.105.0.VOMCNXM:user/release-keys",
+			"tmeAppID":  "qqmusiclight",
+			"nettype":   "NETWORK_WIFI",
+			"udid":      "0",
+			"uid":       "0",
+			"sid":       "",
+			"userip":    "",
 		},
 		"request": map[string]interface{}{
 			"method": "DoSearchForQQMusicLite",
 			"module": "music.search.SearchCgiService",
 			"param": map[string]interface{}{
-				"search_id":   fmt.Sprintf("%d", rand.Int63()),
-				"remoteplace": "search.android.keyboard",
-				"query":       query,
-				"search_type": 0,
+				"search_id":    fmt.Sprintf("%d", rand.Int63()),
+				"remoteplace":  "search.android.keyboard",
+				"query":        query,
+				"search_type":  0,
 				"num_per_page": 10,
-				"page_num":    1,
-				"highlight":   0,
-				"nqc_flag":    0,
-				"page_id":     1,
-				"grp":         1,
+				"page_num":     1,
+				"highlight":    0,
+				"nqc_flag":     0,
+				"page_id":      1,
+				"grp":          1,
 			},
 		},
 	}
@@ -691,41 +691,41 @@ func selectBestMatch(results []*songSearchResult, targetDuration int) *songSearc
 	if len(results) == 0 {
 		return nil
 	}
-	
+
 	// 如果目标时长无效，返回第一个结果
 	if targetDuration <= 0 {
 		return results[0]
 	}
-	
+
 	// 查找时长最接近的结果
 	var bestMatch *songSearchResult
 	minDiff := int(^uint(0) >> 1) // 最大整数值
-	
+
 	for _, result := range results {
 		// 计算时长差的绝对值
 		diff := result.Duration - targetDuration
 		if diff < 0 {
 			diff = -diff
 		}
-		
+
 		// 更新最佳匹配
 		if diff < minDiff {
 			minDiff = diff
 			bestMatch = result
-			
+
 			// 如果完全匹配，直接返回
 			if diff == 0 {
 				break
 			}
 		}
 	}
-	
+
 	// 如果在容忍范围内（±2秒），返回最佳匹配
 	// 否则返回第一个结果（保持向后兼容）
 	if minDiff <= 2 {
 		return bestMatch
 	}
-	
+
 	// 超出容忍范围，返回第一个结果
 	return results[0]
 }
@@ -735,39 +735,39 @@ func (s *QQMusicSource) getLyricsByID(ctx context.Context, songID int64, title, 
 	// 使用 GetPlayLyricInfo API 获取歌词
 	requestData := map[string]interface{}{
 		"comm": map[string]interface{}{
-			"ct":       11,
-			"cv":       "1003006",
-			"v":        "1003006",
-			"os_ver":   "15",
+			"ct":        11,
+			"cv":        "1003006",
+			"v":         "1003006",
+			"os_ver":    "15",
 			"phonetype": "24122RKC7C",
-			"rom":      "Redmi/miro/miro:15/AE3A.240806.005/OS2.0.105.0.VOMCNXM:user/release-keys",
-			"tmeAppID": "qqmusiclight",
-			"nettype":  "NETWORK_WIFI",
-			"udid":     "0",
-			"uid":      "0",
-			"sid":      "",
-			"userip":   "",
+			"rom":       "Redmi/miro/miro:15/AE3A.240806.005/OS2.0.105.0.VOMCNXM:user/release-keys",
+			"tmeAppID":  "qqmusiclight",
+			"nettype":   "NETWORK_WIFI",
+			"udid":      "0",
+			"uid":       "0",
+			"sid":       "",
+			"userip":    "",
 		},
 		"request": map[string]interface{}{
 			"method": "GetPlayLyricInfo",
 			"module": "music.musichallSong.PlayLyricInfo",
 			"param": map[string]interface{}{
-				"albumName": base64.StdEncoding.EncodeToString([]byte("")),
-				"crypt":     1,
-				"ct":        19,
-				"cv":        2111,
-				"interval":  duration,
-				"lrc_t":     0,
-				"qrc":       1,
-				"qrc_t":     0,
-				"roma":      1,
-				"roma_t":    0,
+				"albumName":  base64.StdEncoding.EncodeToString([]byte("")),
+				"crypt":      1,
+				"ct":         19,
+				"cv":         2111,
+				"interval":   duration,
+				"lrc_t":      0,
+				"qrc":        1,
+				"qrc_t":      0,
+				"roma":       1,
+				"roma_t":     0,
 				"singerName": base64.StdEncoding.EncodeToString([]byte(artist)),
-				"songID":    songID,
-				"songName":  base64.StdEncoding.EncodeToString([]byte(title)),
-				"trans":     1,
-				"trans_t":   0,
-				"type":      0,
+				"songID":     songID,
+				"songName":   base64.StdEncoding.EncodeToString([]byte(title)),
+				"trans":      1,
+				"trans_t":    0,
+				"type":       0,
 			},
 		},
 	}
